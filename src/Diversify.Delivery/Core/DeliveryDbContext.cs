@@ -102,6 +102,8 @@ public class DeliveryDbContext(DbContextOptions<DeliveryDbContext> options) : Db
             e.Property(x => x.Method).HasMaxLength(20);
             e.Property(x => x.Reference).HasMaxLength(80);
             e.Property(x => x.GatewayId).HasMaxLength(80);
+            e.Property(x => x.OrderId).HasMaxLength(60);
+            e.HasIndex(x => x.GatewayId);
             e.Property(x => x.ReviewedBy).HasMaxLength(120);
             e.Property(x => x.Notes).HasMaxLength(300);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);

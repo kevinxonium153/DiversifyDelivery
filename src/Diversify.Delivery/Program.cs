@@ -24,7 +24,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
-builder.Services.AddSingleton<IPaymentGateway, SimulatedGateway>();
+builder.Services.AddSingleton<PixelPayService>();
 builder.Services.AddSingleton<DiversifySyncService>();
 builder.Services.AddHostedService<DiversifySyncWorker>();
 
@@ -48,7 +48,8 @@ var app = builder.Build();
 
 app.UseForwardedHeaders();
 app.UseMiddleware<ErrorHandlingMiddleware>();
-app.UseSecurityHeaders();
+var pixelPay = app.Services.GetRequiredService<PixelPayService>();
+app.UseSecurityHeaders(pixelPay.Configured ? pixelPay.Origin : null);
 app.UseDefaultFiles();
 app.UseStaticFiles(new StaticFileOptions
 {

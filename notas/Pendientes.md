@@ -2,11 +2,11 @@
 
 ## Preguntas para definir (dueño del proyecto)
 
-1. **Pasarela de pago para la inscripción de US$5.** ¿Con quién? (PixelPay, BAC Credomatic, Tigo Money, otra). Se
-   necesita la cuenta de comercio y sus credenciales. Hoy: pasarela de prueba + transferencia aprobada por el master.
+1. ~~Pasarela de pago~~ → **PixelPay** (definido 2026-11-09). Falta: credenciales del comercio (Key ID, llave
+   secreta y URL del endpoint) y si cobra en HNL o USD.
 2. **¿Un supermercado o varios?** ¿Delivery es solo para un súper (el de Diversify POS) o un mercado donde varios
    clientes de Diversify venden con sus propios repartidores? El modelo actual es un súper por instalación.
-3. **La inscripción de US$5:** ¿pago único o anual/mensual? ¿Se reembolsa? ¿Se puede regalar (código promocional)?
+3. ~~La inscripción~~ → **pago único** (definido 2026-11-09). Por definir: ¿se reembolsa? ¿códigos promocionales?
 4. **Facturación:** ¿el pedido debe crear la venta en Diversify POS (factura con CAI e inventario)? ¿Quién emite la
    factura y cuándo?
 5. **Zonas y costo de envío:** ¿tarifa fija (hoy L 50) o por zona/colonia/distancia? ¿Hay zonas sin cobertura?
@@ -19,7 +19,10 @@
 
 ## Técnico
 
-- [ ] Pasarela de pago real (implementar `IPaymentGateway` con página de pago externa y aviso del resultado).
+- [x] Cobro de la inscripción con PixelPay (SDK oficial, verificación en el servidor, prueba automática).
+- [ ] Probar PixelPay con el sandbox real desde una computadora (desde la nube lo bloquea Cloudflare) y luego en
+      producción. Confirmar el formato de `api/v2/transaction/status`.
+- [ ] Aviso de PixelPay al servidor (`order_callback`) como respaldo.
 - [ ] Mapa dentro de la app para marcar la ubicación (hoy: GPS del celular + enlaces a Google Maps/Waze).
       Requiere decidir proveedor de mapas (y permitir su dominio en la CSP).
 - [ ] Notificaciones push / WhatsApp de cambios de estado.

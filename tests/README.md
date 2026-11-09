@@ -21,3 +21,18 @@ CAPTURAS=0 node tests/e2e-capturas.cjs      # solo prueba
 ```
 
 Necesita base nueva con datos demo (usa los usuarios `master` y `repartidor` y los pedidos de ejemplo).
+
+## Pago de la inscripción con PixelPay (`pago-pixelpay.cjs`)
+
+Usa el **SDK oficial de PixelPay en el navegador** contra `pixelpay-simulado.cjs` (servidor local con las mismas
+rutas que PixelPay). Prueba: pago aprobado (y que la tarjeta nunca llega a nuestro servidor y llega cifrada a
+PixelPay), rechazado con reintento, estado sin confirmar (queda en revisión), `payment_hash` falso y la CSP.
+
+```bash
+rm -rf src/Diversify.Delivery/data
+PixelPay__Endpoint=http://localhost:5399 PixelPay__Key=prueba-key PixelPay__SecretKey=prueba-secreto \
+  dotnet run --project src/Diversify.Delivery --launch-profile http &
+node tests/pago-pixelpay.cjs
+```
+
+El simulado arranca solo dentro de la prueba (puerto 5399).

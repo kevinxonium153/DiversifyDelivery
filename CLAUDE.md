@@ -56,7 +56,9 @@ Datos locales en `src/Diversify.Delivery/data/` (ignorado por git).
 - Precios con ISV incluido. Total = subtotal (con lo realmente despachado) + envío (gratis desde
   `FreeDeliveryFrom`). Pedido mínimo sin envío.
 - **Código de entrega**: lo ven cliente y master; `ToDto(o, includePin: false)` para el repartidor. No romper.
-- Datos de tarjeta: **nunca** en esta app (pasarela externa).
+- Datos de tarjeta: **nunca** en esta app. Inscripción (pago único US$5) con **PixelPay**: SDK oficial en el
+  navegador (`js/vendor/pixelpay-sdk.js`, página `/pago/` con su propia CSP), verificación en
+  `Modules/PixelPay.cs` (hash + consulta de estado). Ver `docs/PIXELPAY.md`. Prueba: `tests/pago-pixelpay.cjs`.
 - Productos de Diversify POS: `Source = Diversify`, `DiversifyId`. Cambiar el precio a mano → `PriceLocked`.
 
 ## Frontend (`wwwroot`)

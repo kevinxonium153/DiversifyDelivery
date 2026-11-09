@@ -1,42 +1,24 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Diversify.Delivery.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace Diversify.Delivery.Modules;
 
-// Inscripción del cliente ($5). Dos formas de pago:
-//  - Tarjeta: pasarela en línea (IPaymentGateway). La app NUNCA recibe ni guarda datos de tarjeta: la pasarela
-//    real (PixelPay, BAC, etc.) los pide en su propia página y avisa el resultado. Mientras no se contrate,
-//    en desarrollo existe una pasarela simulada (Payments:Simulated=true) que aprueba al instante.
+// Inscripción del cliente (pago único de US$5). Dos formas de pago:
+//  - Tarjeta con PixelPay (ver PixelPay.cs). La app NUNCA recibe datos de tarjeta: el SDK de PixelPay los cifra en
+//    el navegador y los manda directo a PixelPay; aquí solo se verifica el resultado.
+//    En desarrollo, sin PixelPay configurado, hay una pasarela simulada (Payments:Simulated=true) que aprueba al
+//    instante. En producción la app no arranca con ella.
 //  - Transferencia/depósito: el cliente escribe el número de referencia y el master lo aprueba al verlo en el banco.
 
 public record TransferInput(string Reference);
 public record ReviewInput(string? Notes);
+public record CardConfirmInput(string PaymentUuid, string PaymentHash);
 public record RegistrationPaymentDto(int Id, int UserId, string Customer, string? Email, string? Phone, string Method,
     decimal AmountUsd, decimal AmountHnl, string? Reference, string? GatewayId, string Status, string? ReviewedBy, string? Notes,
     DateTime CreatedAt, DateTime? ReviewedAt);
-
-/// <summary>Resultado de iniciar un cobro con tarjeta.</summary>
-public record GatewayResult(bool Approved, string? TransactionId, string? RedirectUrl, string? Error);
-
-public interface IPaymentGateway
-{
-    string Name { get; }
-    bool Enabled { get; }
-    /// <summary>Inicia el cobro. Una pasarela real devuelve RedirectUrl (su página de pago); la simulada aprueba.</summary>
-    Task<GatewayResult> ChargeRegistrationAsync(User user, decimal amountHnl, decimal amountUsd);
-}
-
-/// <summary>Pasarela de prueba para desarrollo y demostraciones. En producción la app no arranca con ella.</summary>
-public class SimulatedGateway(IConfiguration config) : IPaymentGateway
-{
-    public string Name => "Pasarela de prueba";
-    public bool Enabled => config.GetValue("Payments:Simulated", false);
-
-    public Task<GatewayResult> ChargeRegistrationAsync(User user, decimal amountHnl, decimal amountUsd) =>
-        Task.FromResult(new GatewayResult(true, $"SIM-{DateTime.Now:yyMMddHHmmss}-{user.Id}", null, null));
-}
 
 public static class RegistrationEndpoints
 {
@@ -44,15 +26,21 @@ public static class RegistrationEndpoints
         new(p.Id, p.UserId, p.User?.FullName ?? "", p.User?.Email, p.User?.Phone, p.Method, p.AmountUsd, p.AmountHnl, p.Reference,
             p.GatewayId, p.Status.ToString(), p.ReviewedBy, p.Notes, p.CreatedAt, p.ReviewedAt);
 
+    /// <summary>Qué pasarela de tarjeta está activa: PixelPay si está configurada; si no, la simulada (solo desarrollo).</summary>
+    private static string? CardProvider(PixelPayService pixel, IConfiguration config) =>
+        pixel.Configured ? "pixelpay" : config.GetValue("Payments:Simulated", false) ? "simulado" : null;
+
     public static void Map(RouteGroupBuilder api)
     {
         var reg = api.MapGroup("/registration").RequireRoles(Roles.Customer);
 
-        reg.MapGet("/", async (ClaimsPrincipal me, DeliveryDbContext db, IPaymentGateway gateway) =>
+        reg.MapGet("/", async (ClaimsPrincipal me, DeliveryDbContext db, PixelPayService pixel, IConfiguration config) =>
         {
             var s = await db.Settings.OrderBy(x => x.Id).FirstAsync();
             var user = await db.Users.FindAsync(me.UserId());
-            var last = await db.RegistrationPayments.Where(p => p.UserId == me.UserId()).OrderByDescending(p => p.Id).FirstOrDefaultAsync();
+            var last = await db.RegistrationPayments.Where(p => p.UserId == me.UserId() && p.Status != RegistrationPaymentStatus.Pendiente)
+                .OrderByDescending(p => p.Id).FirstOrDefaultAsync();
+            var provider = CardProvider(pixel, config);
             return new
             {
                 status = user!.Status.ToString(),
@@ -60,33 +48,107 @@ public static class RegistrationEndpoints
                 feeHnl = Money.Round(s.RegistrationFeeUsd * s.ExchangeRate),
                 exchangeRate = s.ExchangeRate,
                 bankInstructions = s.BankInstructions,
-                card = new { enabled = gateway.Enabled, name = gateway.Name },
+                card = new
+                {
+                    enabled = provider is not null,
+                    provider,
+                    name = provider == "pixelpay" ? (pixel.Sandbox ? "PixelPay (sandbox)" : "PixelPay") : "Pasarela de prueba",
+                },
                 lastPayment = last is null ? null : new { last.Method, status = last.Status.ToString(), last.Reference, last.Notes, last.CreatedAt },
             };
         });
 
-        reg.MapPost("/card", async (ClaimsPrincipal me, DeliveryDbContext db, IPaymentGateway gateway, IMemoryCache cache) =>
+        // Inicia el pago con tarjeta. Simulada: aprueba. PixelPay: crea el pago pendiente y manda a la página de pago.
+        reg.MapPost("/card", async (ClaimsPrincipal me, DeliveryDbContext db, PixelPayService pixel, IConfiguration config, IMemoryCache cache) =>
         {
-            AppException.ThrowIf(!gateway.Enabled, "El pago con tarjeta aún no está disponible. Usa transferencia.");
+            var provider = CardProvider(pixel, config);
+            AppException.ThrowIf(provider is null, "El pago con tarjeta aún no está disponible. Usa transferencia.");
             var user = await db.Users.FindAsync(me.UserId()) ?? throw AppException.NotFound("Usuario");
             AppException.ThrowIf(user.Status == AccountStatus.Activo, "Tu inscripción ya está pagada.");
+            AppException.ThrowIf(user.Status == AccountStatus.EnRevision, "Ya tienes un pago en revisión. Espera la confirmación.");
             var s = await db.Settings.OrderBy(x => x.Id).FirstAsync();
             var hnl = Money.Round(s.RegistrationFeeUsd * s.ExchangeRate);
-            var result = await gateway.ChargeRegistrationAsync(user, hnl, s.RegistrationFeeUsd);
-            AppException.ThrowIf(!result.Approved && result.RedirectUrl is null, result.Error ?? "El pago fue rechazado.");
 
+            if (provider == "simulado")
+            {
+                db.RegistrationPayments.Add(new RegistrationPayment
+                {
+                    UserId = user.Id, Method = "Tarjeta", AmountUsd = s.RegistrationFeeUsd, AmountHnl = hnl,
+                    GatewayId = $"SIM-{DateTime.Now:yyMMddHHmmss}-{user.Id}", Status = RegistrationPaymentStatus.Aprobado,
+                    ReviewedBy = "Pasarela de prueba", ReviewedAt = DateTime.Now,
+                });
+                user.Status = AccountStatus.Activo;
+                await db.SaveChangesAsync();
+                cache.Remove(SecurityExtensions.SessionCacheKey(user.Id));
+                return Results.Ok(new { provider, approved = true, status = user.Status.ToString() });
+            }
+
+            // PixelPay: un pago pendiente con número de orden propio (no se repite aunque el cliente reintente).
             var payment = new RegistrationPayment
             {
-                UserId = user.Id, Method = "Tarjeta", AmountUsd = s.RegistrationFeeUsd, AmountHnl = hnl, GatewayId = result.TransactionId,
-                Status = result.Approved ? RegistrationPaymentStatus.Aprobado : RegistrationPaymentStatus.Pendiente,
-                ReviewedBy = result.Approved ? gateway.Name : null, ReviewedAt = result.Approved ? DateTime.Now : null,
+                UserId = user.Id, Method = "Tarjeta", AmountUsd = s.RegistrationFeeUsd, AmountHnl = hnl, Status = RegistrationPaymentStatus.Pendiente,
+                OrderId = $"INS-{user.Id}-{DateTime.Now:yyMMddHHmmss}-{RandomNumberGenerator.GetHexString(4)}",
             };
             db.RegistrationPayments.Add(payment);
-            if (result.Approved) user.Status = AccountStatus.Activo;
             await db.SaveChangesAsync();
-            cache.Remove(SecurityExtensions.SessionCacheKey(user.Id));
-            return new { approved = result.Approved, redirectUrl = result.RedirectUrl, transactionId = result.TransactionId, status = user.Status.ToString() };
+            return Results.Ok(new { provider, approved = false, checkoutUrl = $"/pago/?id={payment.Id}" });
         });
+
+        // Datos que necesita el SDK de PixelPay en la página de pago. La llave secreta NUNCA se envía.
+        reg.MapGet("/card/{id:int}", async (int id, ClaimsPrincipal me, DeliveryDbContext db, PixelPayService pixel) =>
+        {
+            AppException.ThrowIf(!pixel.Configured, "El pago con tarjeta no está disponible.");
+            var p = await db.RegistrationPayments.Include(x => x.User).FirstOrDefaultAsync(x => x.Id == id && x.UserId == me.UserId())
+                    ?? throw AppException.NotFound("Pago");
+            AppException.ThrowIf(p.Status != RegistrationPaymentStatus.Pendiente || p.OrderId is null, "Este pago ya fue procesado.");
+            var s = await db.Settings.OrderBy(x => x.Id).FirstAsync();
+            return new
+            {
+                paymentId = p.Id, orderId = p.OrderId, currency = pixel.Currency,
+                amount = pixel.Currency == "USD" ? p.AmountUsd : p.AmountHnl, amountUsd = p.AmountUsd, amountHnl = p.AmountHnl,
+                endpoint = pixel.Endpoint, key = pixel.Key, hash = pixel.AuthHash, sandbox = pixel.Sandbox,
+                customerName = p.User!.FullName, customerEmail = p.User.Email, customerPhone = p.User.Phone,
+                storeName = s.StoreName,
+            };
+        });
+
+        // El navegador reporta el resultado de PixelPay; aquí se verifica antes de activar la cuenta.
+        reg.MapPost("/card/{id:int}/confirm", async (int id, CardConfirmInput input, ClaimsPrincipal me, DeliveryDbContext db,
+            PixelPayService pixel, IMemoryCache cache, CancellationToken ct) =>
+        {
+            var p = await db.RegistrationPayments.Include(x => x.User).FirstOrDefaultAsync(x => x.Id == id && x.UserId == me.UserId(), ct)
+                    ?? throw AppException.NotFound("Pago");
+            AppException.ThrowIf(p.Status != RegistrationPaymentStatus.Pendiente || p.OrderId is null, "Este pago ya fue procesado.");
+            var uuid = Text.Required(input.PaymentUuid, 80, "La transacción");
+            AppException.ThrowIf(!pixel.VerifyHash(p.OrderId, input.PaymentHash), "No pudimos verificar el pago con PixelPay. No se activó la cuenta.");
+            AppException.ThrowIf(await db.RegistrationPayments.AnyAsync(x => x.GatewayId == uuid && x.Id != p.Id, ct), "Esa transacción ya fue usada.");
+
+            var status = await pixel.GetStatusAsync(uuid, pixel.Currency == "USD" ? p.AmountUsd : p.AmountHnl, ct);
+            p.GatewayId = uuid;
+            p.Notes = status.Message.Length > 300 ? status.Message[..300] : status.Message;
+            switch (status.Verdict)
+            {
+                case PixelPayVerdict.Aprobado:
+                    p.Status = RegistrationPaymentStatus.Aprobado;
+                    p.ReviewedBy = "PixelPay";
+                    p.ReviewedAt = DateTime.Now;
+                    p.User!.Status = AccountStatus.Activo;
+                    break;
+                case PixelPayVerdict.Rechazado:
+                    p.Status = RegistrationPaymentStatus.Rechazado;
+                    p.ReviewedBy = "PixelPay";
+                    p.ReviewedAt = DateTime.Now;
+                    break;
+                default:
+                    // Cobro con hash válido pero sin confirmación del estado: el master lo revisa en el portal de PixelPay.
+                    p.Status = RegistrationPaymentStatus.EnRevision;
+                    p.User!.Status = AccountStatus.EnRevision;
+                    break;
+            }
+            await db.SaveChangesAsync(ct);
+            cache.Remove(SecurityExtensions.SessionCacheKey(p.UserId));
+            return new { status = p.Status.ToString(), accountStatus = p.User!.Status.ToString(), message = status.Message };
+        }).RequireRateLimiting(HostingSecurity.PublicLimit);
 
         reg.MapPost("/transfer", async (TransferInput input, ClaimsPrincipal me, DeliveryDbContext db, IMemoryCache cache) =>
         {

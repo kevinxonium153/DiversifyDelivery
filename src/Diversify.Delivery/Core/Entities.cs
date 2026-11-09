@@ -197,6 +197,8 @@ public class RegistrationPayment
     public string? Reference { get; set; }
     /// <summary>Id de la transacción en la pasarela (tarjeta).</summary>
     public string? GatewayId { get; set; }
+    /// <summary>Número de orden enviado a la pasarela (PixelPay order_id). Con él se verifica payment_hash.</summary>
+    public string? OrderId { get; set; }
     public RegistrationPaymentStatus Status { get; set; } = RegistrationPaymentStatus.Pendiente;
     public string? ReviewedBy { get; set; }
     public string? Notes { get; set; }

@@ -22,7 +22,7 @@ namespace Diversify.Delivery.Modules;
 
 public record SyncResult(bool Ok, string Message, int Categories, int Created, int Updated, int Deactivated);
 
-public class DiversifySyncService(IServiceScopeFactory scopes, IConfiguration config, IHttpClientFactory httpFactory, ILogger<DiversifySyncService> log)
+public class DiversifySyncService(IServiceScopeFactory scopes, IConfiguration config, ILogger<DiversifySyncService> log)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
 

@@ -62,3 +62,11 @@
 .steps-reg b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--border); color: var(--text); font-size: 12px; }
 .steps-reg .on b { background: var(--accent); color: var(--on-primary); }
 .steps-reg .on { color: var(--text); }
+
+/* Página de pago con tarjeta (PixelPay) */
+.pay-card { width: min(480px, 100%); padding: 24px 20px; border-radius: var(--radius-xl); display: grid; gap: 14px; }
+.pay-card .secure { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.pay-card .secure .ico { width: 16px; height: 16px; color: var(--success); }
+.card-number { font-family: var(--mono); letter-spacing: .08em; }
+.pay-summary { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border-soft); }
+.pay-summary strong { font-size: 22px; font-variant-numeric: tabular-nums; }

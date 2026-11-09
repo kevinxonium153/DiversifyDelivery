@@ -76,13 +76,13 @@ export async function renderInscription(view, ctx) {
         <p class="muted" style="margin:0">Inscripción única para comprar en línea y recibir a domicilio.</p>
         <div class="pay-amount">${usd(info.feeUsd)}</div><div class="muted small">${money(info.feeHnl)} al cambio de L ${info.exchangeRate}</div></div>
 
-      ${info.status === 'EnRevision' ? `<div class="alert info">${icon('clock')}<div><strong>Estamos verificando tu transferencia</strong> (ref. ${esc(last?.reference || '')}). Normalmente toma menos de una hora en horario de tienda.</div></div>` : ''}
+      ${info.status === 'EnRevision' ? `<div class="alert info">${icon('clock')}<div><strong>Estamos verificando tu pago</strong>${last?.reference ? ` (ref. ${esc(last.reference)})` : ''}. Normalmente toma menos de una hora en horario de tienda.</div></div>` : ''}
       ${last?.status === 'Rechazado' ? `<div class="alert err">${icon('alert')}<div><strong>No pudimos confirmar tu pago anterior.</strong> ${esc(last.notes || '')}</div></div>` : ''}
 
       ${info.status !== 'EnRevision' ? `
       <div class="stack">
         <label class="option"><input type="radio" name="m" value="card" ${info.card.enabled ? 'checked' : 'disabled'}>${icon('card', 'lead')}
-          <div class="grow"><div class="t">Tarjeta de crédito o débito</div><div class="small muted">${info.card.enabled ? 'Aprobación inmediata.' : 'Disponible pronto.'}</div></div></label>
+          <div class="grow"><div class="t">Tarjeta de crédito o débito</div><div class="small muted">${info.card.enabled ? 'Aprobación inmediata con PixelPay.' : 'Disponible pronto.'}</div></div></label>
         <label class="option"><input type="radio" name="m" value="transfer" ${info.card.enabled ? '' : 'checked'}>${icon('bank', 'lead')}
           <div class="grow"><div class="t">Transferencia o depósito</div><div class="small muted">Se activa cuando confirmamos el pago.</div></div></label>
       </div>
@@ -94,10 +94,14 @@ export async function renderInscription(view, ctx) {
   const drawMethod = () => {
     if (!box) return;
     const m = view.querySelector('input[name=m]:checked')?.value;
-    box.innerHTML = m === 'card' ? `<div class="fake-gateway stack">
+    box.innerHTML = m === 'card' ? (info.card.provider === 'pixelpay' ? `<div class="fake-gateway stack">
+        <div class="row between"><strong>${esc(info.card.name)}</strong>${icon('shield')}</div>
+        <p class="small muted" style="margin:0">Pagas con Visa o Mastercard en la página segura de PixelPay. Los datos de tu tarjeta van cifrados directo a PixelPay: nosotros no los vemos ni los guardamos.</p>
+        <button class="btn primary lg block" id="pay-card">${icon('card')} Pagar ${money(info.feeHnl)}</button></div>`
+      : `<div class="fake-gateway stack">
         <div class="row between"><strong>${esc(info.card.name)}</strong><span class="badge st-EnRevision plain">MODO DE PRUEBA</span></div>
-        <p class="small muted" style="margin:0">Los datos de la tarjeta se ingresan en la página segura de la pasarela de pago; Diversify Delivery nunca los ve ni los guarda. En este modo de prueba el pago se aprueba sin cobrar.</p>
-        <button class="btn primary lg block" id="pay-card">${icon('card')} Pagar ${usd(info.feeUsd)}</button></div>`
+        <p class="small muted" style="margin:0">Pasarela simulada de desarrollo: el pago se aprueba sin cobrar. En el servidor real se usa PixelPay.</p>
+        <button class="btn primary lg block" id="pay-card">${icon('card')} Pagar ${usd(info.feeUsd)}</button></div>`)
       : `<form class="stack" id="pay-transfer">
         <div class="alert info">${icon('bank')}<div><strong>Datos para transferir ${money(info.feeHnl)}:</strong><br>${esc(info.bankInstructions || 'Pide los datos al supermercado.')}</div></div>
         <label class="field"><span>Número de referencia o comprobante</span><input name="reference" required maxlength="80" placeholder="Ej.: 123456789"></label>
@@ -105,7 +109,7 @@ export async function renderInscription(view, ctx) {
     box.querySelector('#pay-card')?.addEventListener('click', async (e) => {
       e.currentTarget.disabled = true;
       const r = await attempt(() => api.post('/registration/card'));
-      if (r?.redirectUrl) { location.href = r.redirectUrl; return; }
+      if (r?.checkoutUrl) { location.href = r.checkoutUrl; return; }
       if (r?.approved) { await loadSession(); ctx.refreshBar(); toast('¡Pago aprobado! Tu cuenta está activa.'); renderInscription(view, ctx); }
       else e.currentTarget.disabled = false;
     });

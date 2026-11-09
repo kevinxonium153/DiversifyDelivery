@@ -5,7 +5,7 @@ Desarrolla **PolyMorpha** (San Pedro Sula).
 
 | Quién | Dónde entra | Qué hace |
 |---|---|---|
-| **Cliente final** | `https://delivery.diversify.hn/` | Ve el catálogo sin cuenta. Se registra, paga una **inscripción única de US$5** y hace pedidos con dirección, ubicación GPS e instrucciones. Sigue su pedido en vivo. |
+| **Cliente final** | `https://delivery.diversify.hn/` | Ve el catálogo sin cuenta. Se registra, paga una **inscripción única de US$5** (tarjeta con **PixelPay** o transferencia) y hace pedidos con dirección, ubicación GPS e instrucciones. Sigue su pedido en vivo. |
 | **Master** (administrador) | `/panel/` | Sube productos y fotos, cambia precios (uno por uno o por porcentaje), atiende pedidos en un tablero, asigna repartidores, aprueba inscripciones y configura la tienda. |
 | **Repartidor** | `/repartidor/` (celular) | Toma pedidos, ve instrucciones, referencias y ubicación, abre Google Maps o Waze, llama o escribe por WhatsApp al cliente y confirma la entrega con el código del cliente. |
 
@@ -47,8 +47,9 @@ Abre http://localhost:5390. Datos de demostración (negocio ficticio "Súper La 
 | Cliente activo | `cliente@demo.hn` | `cliente123` |
 | Cliente con transferencia en revisión | `ana@demo.hn` | `cliente123` |
 
-La pasarela de pago es **simulada** en desarrollo (`Payments:Simulated=true`): aprueba la inscripción sin cobrar.
-En producción la app no arranca con ella encendida.
+El cobro con tarjeta usa **PixelPay** ([docs/PIXELPAY.md](docs/PIXELPAY.md)). Sin PixelPay configurado, en
+desarrollo hay una pasarela **simulada** (`Payments:Simulated=true`) que aprueba sin cobrar. Para probar con el
+sandbox de PixelPay: `PixelPay__Sandbox=true`. En producción la app no arranca con la simulada ni con el sandbox.
 
 Para empezar con base limpia: borra `src/Diversify.Delivery/data/`.
 
@@ -59,7 +60,8 @@ node tests/e2e-capturas.cjs
 ```
 
 Recorre el flujo completo (registro → inscripción → carrito → pedido con GPS → master lo arma → repartidor lo
-entrega con el código) y guarda las capturas en `docs/capturas/`. Ver [tests/README.md](tests/README.md).
+entrega con el código) y guarda las capturas en `docs/capturas/`. `tests/pago-pixelpay.cjs` prueba el cobro con
+el SDK de PixelPay contra un PixelPay simulado. Ver [tests/README.md](tests/README.md).
 También: `dotnet build`, `node --check` en cada `.js` y `shellcheck -S warning deploy/*.sh deploy/proxmox/*.sh`
 (los corre la integración continua de GitHub en `master` y `beta`).
 

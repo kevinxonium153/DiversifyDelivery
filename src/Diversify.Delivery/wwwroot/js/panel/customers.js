@@ -12,12 +12,13 @@ export default {
 
     const drawPending = async () => {
       const list = await attempt(() => api.get('/admin/registrations', { status: 'EnRevision' })) || [];
-      el.querySelector('#pending').innerHTML = `<div class="card-title"><h2>${icon('bank')} Transferencias por verificar</h2><span class="badge ${list.length ? 'st-EnRevision' : 'st-Activo'}">${list.length}</span></div>
-        ${list.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>Referencia</th><th class="num">Monto</th><th>Enviado</th><th></th></tr></thead><tbody>
+      el.querySelector('#pending').innerHTML = `<div class="card-title"><h2>${icon('bank')} Pagos por verificar</h2><span class="badge ${list.length ? 'st-EnRevision' : 'st-Activo'}">${list.length}</span></div>
+        ${list.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>Forma de pago</th><th class="num">Monto</th><th>Enviado</th><th></th></tr></thead><tbody>
           ${list.map((p) => `<tr data-id="${p.id}"><td><strong>${esc(p.customer)}</strong><div class="small muted">${esc(p.email || '')} · ${esc(p.phone || '')}</div></td>
-            <td class="mono">${esc(p.reference)}</td><td class="num">${money(p.amountHnl)}<div class="small muted">${usd(p.amountUsd)}</div></td><td>${fmtDateTime(p.createdAt)}</td>
+            <td>${p.method === 'Tarjeta' ? `<strong>Tarjeta · PixelPay</strong><div class="small muted mono">${esc(p.gatewayId || '')}</div><div class="small">${esc(p.notes || '')}</div><div class="small">Confírmalo en el portal de PixelPay antes de aprobar.</div>`
+              : `<strong>Transferencia</strong><div class="mono">${esc(p.reference)}</div>`}</td><td class="num">${money(p.amountHnl)}<div class="small muted">${usd(p.amountUsd)}</div></td><td>${fmtDateTime(p.createdAt)}</td>
             <td class="right"><div class="row" style="justify-content:flex-end"><button class="btn sm danger" data-reject>Rechazar</button><button class="btn sm success" data-approve>${icon('check')} Aprobar</button></div></td></tr>`).join('')}
-          </tbody></table></div>` : '<p class="muted" style="margin:0">No hay transferencias pendientes. Los pagos con tarjeta se aprueban solos.</p>'}`;
+          </tbody></table></div>` : '<p class="muted" style="margin:0">No hay pagos por verificar. Los pagos con tarjeta que PixelPay confirma se aprueban solos.</p>'}`;
     };
 
     const draw = async () => {

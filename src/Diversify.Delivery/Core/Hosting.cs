@@ -63,21 +63,42 @@ public static class HostingSecurity
 
     private static string ClientIp(HttpContext http) => http.Connection.RemoteIpAddress?.ToString() ?? "desconocida";
 
-    /// <summary>Cabeceras de seguridad: CSP estricta (sin CDN ni scripts en línea), igual que Diversify POS.</summary>
-    public static IApplicationBuilder UseSecurityHeaders(this IApplicationBuilder app) => app.Use(async (http, next) =>
+    private const string StrictCsp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
+        "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
+    /// <summary>
+    /// Cabeceras de seguridad: CSP estricta (sin CDN ni scripts en línea), igual que Diversify POS.
+    /// Única excepción: la página de pago (/pago/), donde el SDK de PixelPay (alojado aquí) habla con PixelPay y,
+    /// si el banco pide 3-D Secure, carga el script de Cardinal Commerce y muestra la verificación del banco en un
+    /// marco. <paramref name="paymentOrigin"/> es el origen de PixelPay (null = sin PixelPay).
+    /// </summary>
+    public static IApplicationBuilder UseSecurityHeaders(this IApplicationBuilder app, string? paymentOrigin = null)
+    {
+        const string cardinal = "https://songbird.cardinalcommerce.com https://songbirdstag.cardinalcommerce.com";
+        var paymentCsp = paymentOrigin is null ? StrictCsp :
+            "default-src 'self'; " +
+            $"script-src 'self' {cardinal}; " +
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; " +
+            $"connect-src 'self' {paymentOrigin} https://*.cardinalcommerce.com; " +
+            // La verificación 3-D Secure la muestra el banco emisor de la tarjeta (cualquier dominio HTTPS).
+            "frame-src https:; form-action 'self' https:; " +
+            "object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
+        return app.Use(async (http, next) => await WriteHeaders(http, next, paymentCsp));
+    }
+
+    private static async Task WriteHeaders(HttpContext http, Func<Task> next, string paymentCsp)
     {
         var h = http.Response.Headers;
         h.XContentTypeOptions = "nosniff";
         h["Referrer-Policy"] = "same-origin";
         h.XFrameOptions = "DENY";
         h["Cross-Origin-Opener-Policy"] = "same-origin";
-        h.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
-            "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+        h.ContentSecurityPolicy = http.Request.Path.StartsWithSegments("/pago") ? paymentCsp : StrictCsp;
         // geolocation: el cliente marca su ubicación y el repartidor ve la distancia.
         h["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=(self), payment=(self), serial=(), usb=()";
         if (http.Request.Path.StartsWithSegments("/api")) h.CacheControl = "no-store";
         await next();
-    });
+    }
 
     private static readonly string[] KnownDefaults = ["master123", "repartidor123", "cliente123", "admin123", "cambiar", "changeme"];
 
@@ -92,6 +113,9 @@ public static class HostingSecurity
         if (config.GetValue("Seed:DemoData", false)) problems.Add("Seed:DemoData debe ser false en producción.");
         if ((config["AllowedHosts"] ?? "*") == "*") problems.Add("AllowedHosts debe ser el dominio (ej. delivery.diversify.hn).");
         if (config.GetValue("Payments:Simulated", false)) problems.Add("Payments:Simulated debe ser false en producción (cobraría la inscripción sin dinero real).");
+        if (config.GetValue("PixelPay:Sandbox", false)) problems.Add("PixelPay:Sandbox debe ser false en producción (los cobros serían de prueba).");
+        if (!string.IsNullOrWhiteSpace(config["PixelPay:Key"]) && string.IsNullOrWhiteSpace(config["PixelPay:SecretKey"]))
+            problems.Add("Falta PixelPay:SecretKey (la llave secreta del comercio).");
         if (problems.Count > 0)
             throw new InvalidOperationException("Configuración de producción insegura:\n - " + string.Join("\n - ", problems) +
                 "\nRevisa /etc/diversify-delivery/delivery.env (ver docs/DESPLIEGUE-PROXMOX.md).");

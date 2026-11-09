@@ -51,6 +51,11 @@ Ver [INTEGRACION-DIVERSIFY.md](INTEGRACION-DIVERSIFY.md). En resumen: crear en D
 `bodega`, completar las líneas `Diversify__*` en `/etc/diversify-delivery/delivery.env` y
 `systemctl restart diversify-delivery`.
 
+## 3b. Configurar PixelPay
+
+Ver [PIXELPAY.md](PIXELPAY.md): completar las líneas `PixelPay__*` en `/etc/diversify-delivery/delivery.env` con
+los datos del portal de PixelPay del comercio y reiniciar el servicio.
+
 ## 4. Primeros pasos en el panel
 
 1. **Ajustes:** nombre del súper, horario, costo de envío, pedido mínimo, envío gratis, monto de la inscripción,
@@ -86,7 +91,7 @@ versión anterior. Guarda el servidor y los contenedores en `~/.config/diversify
 ## 7. Seguridad (no romper)
 
 - En producción la app **no arranca** si: la contraseña inicial del master es corta o de ejemplo, `AllowedHosts=*`,
-  `Seed__DemoData=true` o `Payments__Simulated=true`.
+  `Seed__DemoData=true`, `Payments__Simulated=true`, `PixelPay__Sandbox=true` o PixelPay sin llave secreta.
 - CSP estricta: sin scripts en línea ni CDNs.
 - Cookies `HttpOnly`, `Secure`, `SameSite=Lax` (Lax para que el cliente siga con sesión al llegar desde un enlace de
   WhatsApp). Límite de 10 intentos de login por minuto por IP.

@@ -14,11 +14,14 @@ public static class SchemaUpgrades
 {
     private static readonly (string Table, string Column, string SqlType)[] Columns =
     [
-        // ("Products", "Brand", "TEXT NULL"),
+        ("RegistrationPayments", "OrderId", "TEXT NULL"),
     ];
 
     /// <summary>Índices nuevos (IF NOT EXISTS: no hace nada si ya están).</summary>
-    private static readonly string[] Indexes = [];
+    private static readonly string[] Indexes =
+    [
+        "CREATE INDEX IF NOT EXISTS \"IX_RegistrationPayments_GatewayId\" ON \"RegistrationPayments\" (\"GatewayId\")",
+    ];
 
     public static async Task ApplyAsync(DeliveryDbContext db)
     {

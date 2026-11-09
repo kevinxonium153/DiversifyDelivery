@@ -129,6 +129,13 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo "# Pasarela de pago de la inscripción. En producción nunca la simulada."
     echo "Payments__Simulated=false"
     echo
+    echo "# PixelPay (cobro de la inscripción con tarjeta). Datos del portal de PixelPay del comercio."
+    echo "# La llave secreta nunca sale de este servidor. Descomenta, completa y: systemctl restart diversify-delivery"
+    echo "#PixelPay__Endpoint=https://pixelpay.app"
+    echo "#PixelPay__Key=key-id-del-comercio"
+    echo "#PixelPay__SecretKey=llave-secreta-del-comercio"
+    echo "#PixelPay__Currency=HNL"
+    echo
     echo "# Conexión con Diversify POS (catálogo, precios, existencias y fotos). Usuario de rol 'bodega'."
     echo "# Descomenta y completa, luego: systemctl restart diversify-delivery"
     echo "#Diversify__BaseUrl=https://pos.diversify.hn"
