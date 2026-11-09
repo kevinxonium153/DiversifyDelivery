@@ -24,9 +24,10 @@ Necesita base nueva con datos demo (usa los usuarios `master` y `repartidor` y l
 
 ## Pago de la inscripción con PixelPay (`pago-pixelpay.cjs`)
 
-Usa el **SDK oficial de PixelPay en el navegador** contra `pixelpay-simulado.cjs` (servidor local con las mismas
-rutas que PixelPay). Prueba: pago aprobado (y que la tarjeta nunca llega a nuestro servidor y llega cifrada a
-PixelPay), rechazado con reintento, estado sin confirmar (queda en revisión), `payment_hash` falso y la CSP.
+Hosted Payment contra `pixelpay-simulado.cjs` (servidor local con las rutas, campos y firmas de la documentación de
+PixelPay; rechaza una firma SHA3-512 inválida). Prueba: pago aprobado, cancelado, rechazado con reintento, cliente
+que cierra la ventana (activa el aviso), aviso con monto distinto (queda en revisión), `paymentHash` y avisos
+falsos, y la CSP estricta.
 
 ```bash
 rm -rf src/Diversify.Delivery/data

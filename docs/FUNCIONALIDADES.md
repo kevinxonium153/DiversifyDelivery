@@ -57,8 +57,8 @@ Escritorio, claro y oscuro:
 - **Catálogo público:** cualquiera ve productos y precios sin cuenta. Portada con ofertas (precio anterior tachado
   y % de descuento), lo más pedido y una fila por categoría. Búsqueda por nombre, código o código de barras.
 - **Registro + inscripción de US$5, pago único** (se muestra también en lempiras con el tipo de cambio del master):
-  - **Tarjeta con PixelPay:** página de pago propia con el SDK oficial; la tarjeta va cifrada directo a PixelPay
-    (la app nunca la ve ni la guarda). Aprobación inmediata, con verificación en el servidor. Ver
+  - **Tarjeta con PixelPay:** el cliente paga en la página segura de PixelPay (con 3-D Secure) y vuelve solo a
+    la tienda; la app nunca ve ni guarda la tarjeta. Aprobación inmediata, verificada en el servidor. Ver
     [PIXELPAY.md](PIXELPAY.md).
   - **Transferencia/depósito:** el cliente escribe la referencia y el master la aprueba al verla en el banco.
   - Sin inscripción pagada se puede ver todo y llenar el carrito, pero no pedir.

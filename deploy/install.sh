@@ -139,7 +139,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo "#Email__From=\"Mi supermercado <no-responder@${DOMAIN}>\""
     echo
     echo "# PixelPay (cobro de la inscripción con tarjeta). Datos del portal de PixelPay del comercio."
-    echo "# La llave secreta nunca sale de este servidor. Descomenta, completa y: systemctl restart diversify-delivery"
+    echo "# La llave secreta nunca sale de este servidor. Requiere App__PublicUrl en https (arriba)."
+    echo "# Descomenta, completa y: systemctl restart diversify-delivery"
     echo "#PixelPay__Endpoint=https://pixelpay.app"
     echo "#PixelPay__Key=key-id-del-comercio"
     echo "#PixelPay__SecretKey=llave-secreta-del-comercio"

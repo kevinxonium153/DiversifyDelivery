@@ -3,82 +3,97 @@
 La inscripción de los clientes es un **pago único de US$5** (se cobra en lempiras al tipo de cambio de Ajustes, o
 en dólares si el comercio lo tiene habilitado). Se paga con tarjeta por **PixelPay** o por transferencia.
 
-| Pago con tarjeta | Aprobado | Rechazado | En revisión (panel) |
+La integración es **Hosted Payment**: el cliente escribe la tarjeta en la página de pago de PixelPay, no en la
+nuestra. Es lo que recomienda la documentación oficial de PixelPay cuando el comercio no quiere manejar datos de
+tarjeta (ver [Decisión 005](../notas/Decisiones/005%20PixelPay%20Hosted%20Payment.md)).
+
+| Antes de ir a PixelPay | Pago aprobado | Canceló en PixelPay | Monto distinto (panel) |
 |---|---|---|---|
-| ![](capturas/40-pago-pixelpay.png) | ![](capturas/41-pago-aprobado.png) | ![](capturas/42-pago-rechazado.png) | ![](capturas/43-panel-pago-en-revision.png) |
+| ![](capturas/40-pago-pixelpay.png) | ![](capturas/41-pago-aprobado.png) | ![](capturas/42-pago-cancelado.png) | ![](capturas/43-panel-pago-en-revision.png) |
 
 ## Cómo funciona
 
 ```mermaid
 sequenceDiagram
     actor C as Cliente
-    participant P as Página /pago (navegador)
-    participant SDK as SDK de PixelPay (en el navegador)
-    participant PX as PixelPay
     participant D as Diversify Delivery (servidor)
-    C->>P: "Pagar con tarjeta"
-    P->>D: POST /api/registration/card
-    D-->>P: pago pendiente con order_id propio (INS-…)
-    C->>P: escribe la tarjeta
-    P->>SDK: datos de la tarjeta (no salen hacia nuestro servidor)
-    SDK->>PX: tarjeta CIFRADA con la llave pública del comercio (+ 3-D Secure si el banco lo pide)
-    PX-->>SDK: payment_uuid + payment_hash
-    P->>D: POST /confirm { payment_uuid, payment_hash }
-    D->>D: payment_hash = MD5(order_id | key | llave secreta) ?
-    D->>PX: api/v2/transaction/status (¿aprobada? ¿monto?)
-    D-->>P: Aprobado → cuenta activa · Rechazado · En revisión
+    participant PX as PixelPay (checkout)
+    C->>D: "Pagar con PixelPay"
+    D->>PX: POST hosted/other: orden INS-…, monto, firma x-client-signature
+    PX-->>D: URL del checkout
+    D-->>C: redirige a PixelPay
+    C->>PX: escribe la tarjeta (+ 3-D Secure si el banco lo pide)
+    PX-->>C: redirige a /api/pixelpay/registro/{id}/completo?paymentHash=…
+    C->>D: (regreso)
+    D->>D: paymentHash = MD5(order_id | key | llave secreta) → cuenta Activa
+    PX->>D: POST /api/pixelpay/aviso (respaldo, servidor a servidor)
+    D->>D: payment_hash + estado "paid" + monto
 ```
 
-- **Los datos de la tarjeta nunca llegan a nuestro servidor.** El SDK oficial (`@pixelpay/sdk-core` 2.5.10, MIT,
-  alojado en `wwwroot/js/vendor/pixelpay-sdk.js`) los cifra en el navegador y los manda directo a PixelPay. La
-  prueba automática revisa que ninguna petición a nuestro servidor lleve el número de tarjeta.
-- **La llave secreta nunca sale del servidor.** Al navegador va la *Key ID* y el MD5 de la llave secreta, que es
-  lo que el SDK necesita (así lo diseñó PixelPay). Con la llave secreta el servidor verifica `payment_hash`.
-- **Doble verificación:** hash válido **y** PixelPay confirma que la transacción está aprobada (y por el monto
-  correcto). Si PixelPay no responde o no lo indica, el pago queda **En revisión**: el master lo confirma en el
-  portal de PixelPay y lo aprueba en *Clientes e inscripciones*.
-- Cada intento usa un `order_id` distinto (`INS-<cliente>-<fecha>-<aleatorio>`); una transacción no se puede
-  usar dos veces.
-- **CSP:** solo la página `/pago/` permite conectarse a PixelPay y a Cardinal Commerce (3-D Secure) y mostrar la
-  verificación del banco en un marco. El resto del sitio sigue con la política estricta de siempre.
+- **Los datos de la tarjeta nunca pasan por esta app.** Ni el navegador de nuestra tienda ni el servidor los ven.
+  3-D Secure lo resuelve PixelPay en su página.
+- **La llave secreta nunca sale del servidor.** Con ella se firma cada orden (`_client_signature` y la cabecera
+  `x-client-signature`: HMAC **SHA3-512** de `key|order_id|endpoint`, como pide la guía
+  "Firma de Seguridad" de PixelPay) y se verifica `payment_hash`.
+- **El monto lo fija el servidor**, al crear la orden servidor a servidor. El navegador no lo puede cambiar.
+- **Dos vías de confirmación:** el regreso del cliente (`_complete`, con `paymentHash`) y el aviso de PixelPay
+  (`_callback`). Si el cliente cierra la ventana justo después de pagar, el aviso activa la cuenta igual.
+  Si el aviso trae un monto o moneda distinta, el pago queda **En revisión** con el motivo, y el master lo
+  confirma en el portal de PixelPay.
+- Cada intento usa un `order_id` distinto (`INS-<cliente>-<fecha>-<aleatorio>`). Si el cliente cancela en
+  PixelPay vuelve a la inscripción sin cobro y puede reintentar.
+- **CSP estricta en todo el sitio**: no se carga ningún script de PixelPay.
+
+Rutas propias (sin sesión; las protege `payment_hash`, que solo PixelPay y nosotros podemos calcular):
+
+| Ruta | Quién la llama |
+|---|---|
+| `GET /api/pixelpay/registro/{id}/completo?paymentHash=` | El navegador del cliente, redirigido por PixelPay al aprobarse |
+| `GET /api/pixelpay/registro/{id}/cancelado` | El navegador del cliente, al tocar "Cancelar y regresar" |
+| `POST /api/pixelpay/aviso` | PixelPay (webhook). Debe ser público: no ponerlo detrás de Cloudflare Access |
 
 ## Configuración en el servidor
 
-En `/etc/diversify-delivery/delivery.env` (los datos salen del portal de PixelPay del comercio):
+En `/etc/diversify-delivery/delivery.env` (los datos salen del portal de PixelPay del comercio, **Preferencias →
+Opciones del API**):
 
 ```ini
-PixelPay__Endpoint=https://pixelpay.app      # o la URL que PixelPay asigne al comercio
+App__PublicUrl=https://delivery.diversify.hn  # lo pone el instalador; PixelPay devuelve al cliente aquí
+PixelPay__Endpoint=https://pixelpay.app       # el dominio que aparece en la barra del portal del comercio
 PixelPay__Key=key-id-del-comercio
 PixelPay__SecretKey=llave-secreta-del-comercio
-PixelPay__Currency=HNL                       # USD solo si el comercio cobra en dólares
+PixelPay__Currency=HNL                        # USD solo si el comercio cobra en dólares
 ```
 
 Luego `systemctl restart diversify-delivery`. Con PixelPay configurado, la pasarela simulada desaparece.
-En producción la app no arranca si `PixelPay__Sandbox=true` o si falta la llave secreta.
+En producción la app **no arranca** si `PixelPay__Sandbox=true`, si falta la llave secreta, si `App__PublicUrl`
+no es `https://…` o si el sistema no soporta SHA3-512 (OpenSSL 1.1.1 o más reciente; Debian 12 lo trae).
 
 ## Probar con el sandbox de PixelPay (desde tu computadora)
 
-El sandbox (`pixelpay.dev`) tiene una verificación de Cloudflare que bloquea el tráfico automático desde
-servidores en la nube, así que **no se pudo probar aquí**. Pruébalo desde tu computadora:
+Desde los servidores en la nube donde se desarrolló esto no se llega al sandbox (Cloudflare lo bloquea), así que
+**falta probarlo con PixelPay real**. Desde tu computadora:
 
 1. `PixelPay__Sandbox=true dotnet run --project src/Diversify.Delivery --launch-profile http`
-2. Abre http://localhost:5390, crea una cuenta y elige **Tarjeta**. Debe decir "Modo de prueba (sandbox)".
-3. Paga con una tarjeta de prueba de PixelPay (las publica PixelPay en su documentación del sandbox; la Visa de
-   prueba habitual es `4111 1111 1111 1111`, vencimiento futuro, CVV `999`).
-4. Revisa que la cuenta quede **Activa** y que el pago aparezca en el portal de prueba de PixelPay.
+   (usa la ruta `hosted/sandbox` y las llaves públicas de prueba de PixelPay: Key `1234567890`).
+2. Abre http://localhost:5390, crea una cuenta y toca **Pagar con PixelPay**: debe abrir el checkout de prueba de
+   PixelPay.
+3. Elige **Pago exitoso**: debe volver a la tienda con "¡Pago aprobado!" y la cuenta **Activa**.
+4. Prueba también **Cancelar orden**: debe volver con "No se hizo ningún cobro".
+5. El aviso (`_callback`) no puede llegar a `localhost`; se prueba en el servidor de pruebas (rama `beta`) con su
+   dominio público, usando **Ejecutar callback** del sandbox.
 
-Si el paso 4 falla con "PixelPay no indicó si la transacción fue aprobada", el formato de la consulta de estado es
-distinto al que usa el SDK: el pago queda en revisión (no se pierde) y hay que ajustar `PixelPayService.GetStatusAsync`
-con la respuesta real.
+Si PixelPay responde "Firma de seguridad inválida", revisa que `PixelPay__Endpoint` sea exactamente el dominio del
+portal del comercio (la firma incluye ese valor).
 
 ## Pruebas automáticas
 
-`tests/pago-pixelpay.cjs` usa el **SDK oficial en el navegador** contra `tests/pixelpay-simulado.cjs` (mismas rutas
-y formato que PixelPay): pago aprobado, rechazado y reintento, estado sin confirmar, `payment_hash` falso y CSP.
+`tests/pago-pixelpay.cjs` contra `tests/pixelpay-simulado.cjs` (mismas rutas, campos y firmas que la
+documentación de PixelPay): pago aprobado, cancelado, rechazado con reintento, cliente que cierra la ventana (solo
+aviso), aviso con monto distinto, `paymentHash` y avisos falsos, y CSP estricta.
 
 ## Pendiente
 
 - Probar con el sandbox real y luego con las credenciales de producción del comercio.
-- Confirmar con PixelPay el formato exacto de `api/v2/transaction/status` (se tomó del SDK).
-- Aviso del resultado de PixelPay al servidor (`order_callback`) como respaldo si el cliente cierra la página justo
-  después de pagar. Hoy, ese caso se resuelve revisando el portal de PixelPay.
+- Confirmar con PixelPay el formato exacto del aviso (`_callback`): se tomó de su documentación (`order`,
+  `payment_hash`, `status: "paid"`, `amount`, `currency`, `uuid`).

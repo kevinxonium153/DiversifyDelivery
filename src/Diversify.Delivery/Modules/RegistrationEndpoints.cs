@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Diversify.Delivery.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -7,15 +8,14 @@ using Microsoft.Extensions.Caching.Memory;
 namespace Diversify.Delivery.Modules;
 
 // Inscripción del cliente (pago único de US$5). Dos formas de pago:
-//  - Tarjeta con PixelPay (ver PixelPay.cs). La app NUNCA recibe datos de tarjeta: el SDK de PixelPay los cifra en
-//    el navegador y los manda directo a PixelPay; aquí solo se verifica el resultado.
+//  - Tarjeta con PixelPay (ver PixelPay.cs). La app NUNCA recibe datos de tarjeta: el cliente paga en el checkout
+//    de PixelPay (Hosted Payment) y aquí solo se verifica el resultado (regreso del cliente y aviso de PixelPay).
 //    En desarrollo, sin PixelPay configurado, hay una pasarela simulada (Payments:Simulated=true) que aprueba al
 //    instante. En producción la app no arranca con ella.
 //  - Transferencia/depósito: el cliente escribe el número de referencia y el master lo aprueba al verlo en el banco.
 
 public record TransferInput(string Reference);
 public record ReviewInput(string? Notes);
-public record CardConfirmInput(string PaymentUuid, string PaymentHash);
 public record RegistrationPaymentDto(int Id, int UserId, string Customer, string? Email, string? Phone, string Method,
     decimal AmountUsd, decimal AmountHnl, string? Reference, string? GatewayId, string Status, string? ReviewedBy, string? Notes,
     DateTime CreatedAt, DateTime? ReviewedAt);
@@ -29,6 +29,18 @@ public static class RegistrationEndpoints
     /// <summary>Qué pasarela de tarjeta está activa: PixelPay si está configurada; si no, la simulada (solo desarrollo).</summary>
     private static string? CardProvider(PixelPayService pixel, IConfiguration config) =>
         pixel.Configured ? "pixelpay" : config.GetValue("Payments:Simulated", false) ? "simulado" : null;
+
+    /// <summary>Monto que se cobra en PixelPay, en la moneda del comercio.</summary>
+    private static decimal ExpectedAmount(RegistrationPayment p, PixelPayService pixel) => pixel.Currency == "USD" ? p.AmountUsd : p.AmountHnl;
+
+    private static void Approve(RegistrationPayment p, string by, string note)
+    {
+        p.Status = RegistrationPaymentStatus.Aprobado;
+        p.ReviewedBy = by;
+        p.ReviewedAt = DateTime.Now;
+        p.Notes = note;
+        p.User!.Status = AccountStatus.Activo;
+    }
 
     public static void Map(RouteGroupBuilder api)
     {
@@ -52,21 +64,23 @@ public static class RegistrationEndpoints
                 {
                     enabled = provider is not null,
                     provider,
+                    currency = provider == "pixelpay" ? pixel.Currency : "USD",
                     name = provider == "pixelpay" ? (pixel.Sandbox ? "PixelPay (sandbox)" : "PixelPay") : "Pasarela de prueba",
                 },
                 lastPayment = last is null ? null : new { last.Method, status = last.Status.ToString(), last.Reference, last.Notes, last.CreatedAt },
             };
         });
 
-        // Inicia el pago con tarjeta. Simulada: aprueba. PixelPay: crea el pago pendiente y manda a la página de pago.
-        reg.MapPost("/card", async (ClaimsPrincipal me, DeliveryDbContext db, PixelPayService pixel, IConfiguration config, IMemoryCache cache) =>
+        // Inicia el pago con tarjeta. Simulada: aprueba. PixelPay: crea el cobro y devuelve la URL de su checkout.
+        reg.MapPost("/card", async (ClaimsPrincipal me, DeliveryDbContext db, PixelPayService pixel, IConfiguration config, IMemoryCache cache,
+            HttpContext http, CancellationToken ct) =>
         {
             var provider = CardProvider(pixel, config);
             AppException.ThrowIf(provider is null, "El pago con tarjeta aún no está disponible. Usa transferencia.");
-            var user = await db.Users.FindAsync(me.UserId()) ?? throw AppException.NotFound("Usuario");
+            var user = await db.Users.FindAsync([me.UserId()], ct) ?? throw AppException.NotFound("Usuario");
             AppException.ThrowIf(user.Status == AccountStatus.Activo, "Tu inscripción ya está pagada.");
             AppException.ThrowIf(user.Status == AccountStatus.EnRevision, "Ya tienes un pago en revisión. Espera la confirmación.");
-            var s = await db.Settings.OrderBy(x => x.Id).FirstAsync();
+            var s = await db.Settings.OrderBy(x => x.Id).FirstAsync(ct);
             var hnl = Money.Round(s.RegistrationFeeUsd * s.ExchangeRate);
 
             if (provider == "simulado")
@@ -78,76 +92,38 @@ public static class RegistrationEndpoints
                     ReviewedBy = "Pasarela de prueba", ReviewedAt = DateTime.Now,
                 });
                 user.Status = AccountStatus.Activo;
-                await db.SaveChangesAsync();
+                await db.SaveChangesAsync(ct);
                 cache.Remove(SecurityExtensions.SessionCacheKey(user.Id));
                 return Results.Ok(new { provider, approved = true, status = user.Status.ToString() });
             }
 
-            // PixelPay: un pago pendiente con número de orden propio (no se repite aunque el cliente reintente).
+            AppException.ThrowIf(string.IsNullOrWhiteSpace(user.Email), "Agrega tu correo en Mi cuenta para pagar con tarjeta.");
+            // Un número de orden propio por intento (PixelPay no acepta repetidos).
             var payment = new RegistrationPayment
             {
                 UserId = user.Id, Method = "Tarjeta", AmountUsd = s.RegistrationFeeUsd, AmountHnl = hnl, Status = RegistrationPaymentStatus.Pendiente,
                 OrderId = $"INS-{user.Id}-{DateTime.Now:yyMMddHHmmss}-{RandomNumberGenerator.GetHexString(4)}",
             };
             db.RegistrationPayments.Add(payment);
-            await db.SaveChangesAsync();
-            return Results.Ok(new { provider, approved = false, checkoutUrl = $"/pago/?id={payment.Id}" });
-        });
-
-        // Datos que necesita el SDK de PixelPay en la página de pago. La llave secreta NUNCA se envía.
-        reg.MapGet("/card/{id:int}", async (int id, ClaimsPrincipal me, DeliveryDbContext db, PixelPayService pixel) =>
-        {
-            AppException.ThrowIf(!pixel.Configured, "El pago con tarjeta no está disponible.");
-            var p = await db.RegistrationPayments.Include(x => x.User).FirstOrDefaultAsync(x => x.Id == id && x.UserId == me.UserId())
-                    ?? throw AppException.NotFound("Pago");
-            AppException.ThrowIf(p.Status != RegistrationPaymentStatus.Pendiente || p.OrderId is null, "Este pago ya fue procesado.");
-            var s = await db.Settings.OrderBy(x => x.Id).FirstAsync();
-            return new
-            {
-                paymentId = p.Id, orderId = p.OrderId, currency = pixel.Currency,
-                amount = pixel.Currency == "USD" ? p.AmountUsd : p.AmountHnl, amountUsd = p.AmountUsd, amountHnl = p.AmountHnl,
-                endpoint = pixel.Endpoint, key = pixel.Key, hash = pixel.AuthHash, sandbox = pixel.Sandbox,
-                customerName = p.User!.FullName, customerEmail = p.User.Email, customerPhone = p.User.Phone,
-                storeName = s.StoreName,
-            };
-        });
-
-        // El navegador reporta el resultado de PixelPay; aquí se verifica antes de activar la cuenta.
-        reg.MapPost("/card/{id:int}/confirm", async (int id, CardConfirmInput input, ClaimsPrincipal me, DeliveryDbContext db,
-            PixelPayService pixel, IMemoryCache cache, CancellationToken ct) =>
-        {
-            var p = await db.RegistrationPayments.Include(x => x.User).FirstOrDefaultAsync(x => x.Id == id && x.UserId == me.UserId(), ct)
-                    ?? throw AppException.NotFound("Pago");
-            AppException.ThrowIf(p.Status != RegistrationPaymentStatus.Pendiente || p.OrderId is null, "Este pago ya fue procesado.");
-            var uuid = Text.Required(input.PaymentUuid, 80, "La transacción");
-            AppException.ThrowIf(!pixel.VerifyHash(p.OrderId, input.PaymentHash), "No pudimos verificar el pago con PixelPay. No se activó la cuenta.");
-            AppException.ThrowIf(await db.RegistrationPayments.AnyAsync(x => x.GatewayId == uuid && x.Id != p.Id, ct), "Esa transacción ya fue usada.");
-
-            var status = await pixel.GetStatusAsync(uuid, pixel.Currency == "USD" ? p.AmountUsd : p.AmountHnl, ct);
-            p.GatewayId = uuid;
-            p.Notes = status.Message.Length > 300 ? status.Message[..300] : status.Message;
-            switch (status.Verdict)
-            {
-                case PixelPayVerdict.Aprobado:
-                    p.Status = RegistrationPaymentStatus.Aprobado;
-                    p.ReviewedBy = "PixelPay";
-                    p.ReviewedAt = DateTime.Now;
-                    p.User!.Status = AccountStatus.Activo;
-                    break;
-                case PixelPayVerdict.Rechazado:
-                    p.Status = RegistrationPaymentStatus.Rechazado;
-                    p.ReviewedBy = "PixelPay";
-                    p.ReviewedAt = DateTime.Now;
-                    break;
-                default:
-                    // Cobro con hash válido pero sin confirmación del estado: el master lo revisa en el portal de PixelPay.
-                    p.Status = RegistrationPaymentStatus.EnRevision;
-                    p.User!.Status = AccountStatus.EnRevision;
-                    break;
-            }
             await db.SaveChangesAsync(ct);
-            cache.Remove(SecurityExtensions.SessionCacheKey(p.UserId));
-            return new { status = p.Status.ToString(), accountStatus = p.User!.Status.ToString(), message = status.Message };
+
+            var site = HostingSecurity.PublicBaseUrl(config, http);
+            var title = $"Inscripción {s.StoreName}";
+            try
+            {
+                var url = await pixel.CreateCheckoutAsync(new HostedOrder(payment.OrderId, ExpectedAmount(payment, pixel),
+                    title.Length > 60 ? title[..60] : title, user.FullName, user.Email!, user.Phone,
+                    CompleteUrl: $"{site}/api/pixelpay/registro/{payment.Id}/completo",
+                    CancelUrl: $"{site}/api/pixelpay/registro/{payment.Id}/cancelado",
+                    CallbackUrl: $"{site}/api/pixelpay/aviso"), ct);
+                return Results.Ok(new { provider, approved = false, checkoutUrl = url });
+            }
+            catch (AppException)
+            {
+                db.RegistrationPayments.Remove(payment); // no llegó a PixelPay: no queda nada pendiente
+                await db.SaveChangesAsync(CancellationToken.None);
+                throw;
+            }
         }).RequireRateLimiting(HostingSecurity.PublicLimit);
 
         reg.MapPost("/transfer", async (TransferInput input, ClaimsPrincipal me, DeliveryDbContext db, IMemoryCache cache) =>
@@ -167,6 +143,80 @@ public static class RegistrationEndpoints
             await db.SaveChangesAsync();
             cache.Remove(SecurityExtensions.SessionCacheKey(user.Id));
             return new { status = user.Status.ToString() };
+        });
+
+        // ---------- Regreso del checkout y aviso de PixelPay (sin sesión: los valida payment_hash) ----------
+        var pixelpay = api.MapGroup("/pixelpay").RequireRateLimiting(HostingSecurity.PublicLimit);
+
+        // _complete: PixelPay devuelve aquí al cliente cuando el pago se aprobó, con ?paymentHash=…
+        pixelpay.MapGet("/registro/{id:int}/completo", async (int id, string? paymentHash, DeliveryDbContext db, PixelPayService pixel,
+            IMemoryCache cache, ILogger<PixelPayService> log, CancellationToken ct) =>
+        {
+            var p = await db.RegistrationPayments.Include(x => x.User).FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (p?.OrderId is null) return Results.Redirect("/#/inscripcion/error");
+            if (p.Status == RegistrationPaymentStatus.Pendiente)
+            {
+                if (!pixel.VerifyHash(p.OrderId, paymentHash))
+                {
+                    log.LogWarning("Regreso de PixelPay con paymentHash inválido para la orden {Order}", p.OrderId);
+                    return Results.Redirect("/#/inscripcion/error");
+                }
+                Approve(p, "PixelPay", "Aprobado por PixelPay.");
+                await db.SaveChangesAsync(ct);
+                cache.Remove(SecurityExtensions.SessionCacheKey(p.UserId));
+            }
+            return Results.Redirect(p.Status switch
+            {
+                RegistrationPaymentStatus.Aprobado => "/#/inscripcion/ok",
+                RegistrationPaymentStatus.EnRevision => "/#/inscripcion",
+                _ => "/#/inscripcion/error",
+            });
+        });
+
+        // _cancel: el cliente tocó "cancelar y regresar". El pago queda pendiente (no se muestra) y puede reintentar.
+        pixelpay.MapGet("/registro/{id:int}/cancelado", (int id) => Results.Redirect("/#/inscripcion/cancelado"));
+
+        // _callback: PixelPay avisa servidor a servidor cada cobro pagado (reintenta 3 veces si no recibe 200).
+        // Cubre al cliente que cierra la ventana justo después de pagar.
+        pixelpay.MapPost("/aviso", async (HttpRequest req, DeliveryDbContext db, PixelPayService pixel, IMemoryCache cache,
+            ILogger<PixelPayService> log, CancellationToken ct) =>
+        {
+            JsonDocument doc;
+            try { doc = await JsonDocument.ParseAsync(req.Body, cancellationToken: ct); }
+            catch (JsonException) { return Results.BadRequest(new { error = "JSON inválido." }); }
+            using var _ = doc;
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return Results.BadRequest(new { error = "JSON inválido." });
+            var orderId = PixelPayService.ReadString(root, "order");
+            var p = orderId is null ? null : await db.RegistrationPayments.Include(x => x.User).FirstOrDefaultAsync(x => x.OrderId == orderId, ct);
+            if (p is null) return Results.NotFound(new { error = "Orden desconocida." });
+            if (!pixel.VerifyHash(p.OrderId!, PixelPayService.ReadString(root, "payment_hash")))
+            {
+                log.LogWarning("Aviso de PixelPay con payment_hash inválido para la orden {Order}", orderId);
+                return Results.BadRequest(new { error = "payment_hash inválido." });
+            }
+            if (!string.Equals(PixelPayService.ReadString(root, "status"), "paid", StringComparison.OrdinalIgnoreCase))
+                return Results.Ok(new { received = true });
+
+            var uuid = PixelPayService.ReadString(root, "uuid");
+            if (uuid is not null && uuid.Length <= 80) p.GatewayId ??= uuid;
+            if (p.Status == RegistrationPaymentStatus.Pendiente)
+            {
+                var paid = PixelPayService.ReadDecimal(root, "amount");
+                var currency = PixelPayService.ReadString(root, "currency");
+                var expected = ExpectedAmount(p, pixel);
+                if (paid is null || Math.Abs(paid.Value - expected) > 0.01m || (currency is not null && !currency.Equals(pixel.Currency, StringComparison.OrdinalIgnoreCase)))
+                {
+                    // Pagado, pero no por lo esperado: lo decide el master al verlo en el portal de PixelPay.
+                    p.Status = RegistrationPaymentStatus.EnRevision;
+                    p.User!.Status = AccountStatus.EnRevision;
+                    p.Notes = $"PixelPay avisó un pago de {currency} {paid:N2}; se esperaba {pixel.Currency} {expected:N2}.";
+                }
+                else Approve(p, "PixelPay", "Aprobado por PixelPay (aviso del servidor).");
+                cache.Remove(SecurityExtensions.SessionCacheKey(p.UserId));
+            }
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new { received = true });
         });
 
         // ---------- Master: revisar transferencias ----------

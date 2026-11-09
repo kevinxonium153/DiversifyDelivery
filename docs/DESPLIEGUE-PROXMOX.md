@@ -54,7 +54,9 @@ Ver [INTEGRACION-DIVERSIFY.md](INTEGRACION-DIVERSIFY.md). En resumen: crear en D
 ## 3b. Configurar PixelPay
 
 Ver [PIXELPAY.md](PIXELPAY.md): completar las líneas `PixelPay__*` en `/etc/diversify-delivery/delivery.env` con
-los datos del portal de PixelPay del comercio y reiniciar el servicio.
+los datos del portal de PixelPay del comercio y reiniciar el servicio. `App__PublicUrl` (lo pone el instalador) debe ser
+la dirección https de la tienda: PixelPay devuelve ahí al cliente. Si usas Cloudflare Access, deja pública la ruta
+`/api/pixelpay/aviso` (PixelPay avisa ahí cada pago).
 
 ## 3c. Configurar el correo (recuperar contraseña)
 
@@ -116,7 +118,7 @@ versión anterior. Guarda el servidor y los contenedores en `~/.config/diversify
 ## 7. Seguridad (no romper)
 
 - En producción la app **no arranca** si: la contraseña inicial del master es corta o de ejemplo, `AllowedHosts=*`,
-  `Seed__DemoData=true`, `Payments__Simulated=true`, `PixelPay__Sandbox=true` o PixelPay sin llave secreta.
+  `Seed__DemoData=true`, `Payments__Simulated=true`, `PixelPay__Sandbox=true`, o PixelPay sin llave secreta o sin `App__PublicUrl` https.
 - CSP estricta: sin scripts en línea ni CDNs.
 - Cookies `HttpOnly`, `Secure`, `SameSite=Lax` (Lax para que el cliente siga con sesión al llegar desde un enlace de
   WhatsApp). Límite de 10 intentos de login por minuto por IP.

@@ -19,10 +19,10 @@
 
 ## Técnico
 
-- [x] Cobro de la inscripción con PixelPay (SDK oficial, verificación en el servidor, prueba automática).
+- [x] Cobro de la inscripción con PixelPay: Hosted Payment, orden firmada (SHA3-512), regreso y aviso
+      (`_callback`) verificados, prueba automática. Revisado con la documentación oficial (MCP de PixelPay).
 - [ ] Probar PixelPay con el sandbox real desde una computadora (desde la nube lo bloquea Cloudflare) y luego en
-      producción. Confirmar el formato de `api/v2/transaction/status`.
-- [ ] Aviso de PixelPay al servidor (`order_callback`) como respaldo.
+      producción. Confirmar el formato del aviso (`_callback`) con un pago real.
 - [ ] Mapa dentro de la app para marcar la ubicación (hoy: GPS del celular + enlaces a Google Maps/Waze).
       Requiere decidir proveedor de mapas (y permitir su dominio en la CSP).
 - [ ] Notificaciones push / WhatsApp de cambios de estado.

@@ -59,13 +59,15 @@ export function renderRegister(view, ctx) {
   });
 }
 
-export async function renderInscription(view, ctx) {
+// result: lo que pasó en el checkout de PixelPay (#/inscripcion/ok | cancelado | error).
+export async function renderInscription(view, ctx, result) {
   if (state.user.role !== 'cliente') { ctx.navigate('#/'); return; }
   const info = await attempt(() => api.get('/registration'));
   if (!info) return;
   if (info.status === 'Activo') {
+    if (result === 'ok' && state.user.status !== 'Activo') { await loadSession(); ctx.refreshBar(); }
     view.innerHTML = `<div class="auth-wrap" style="min-height:auto"><div class="auth-card glass" style="text-align:center">
-      <div style="font-size:56px">🎉</div><h1 style="font-size:22px">¡Tu cuenta está activa!</h1>
+      <div style="font-size:56px">🎉</div><h1 style="font-size:22px">${result === 'ok' ? '¡Pago aprobado!' : '¡Tu cuenta está activa!'}</h1>
       <p class="muted">Ya puedes hacer pedidos.</p><a class="btn primary lg block" href="#/">Ir a comprar</a></div></div>`;
     return;
   }
@@ -78,6 +80,8 @@ export async function renderInscription(view, ctx) {
         <div class="pay-amount">${usd(info.feeUsd)}</div><div class="muted small">${money(info.feeHnl)} al cambio de L ${info.exchangeRate}</div></div>
 
       ${info.status === 'EnRevision' ? `<div class="alert info">${icon('clock')}<div><strong>Estamos verificando tu pago</strong>${last?.reference ? ` (ref. ${esc(last.reference)})` : ''}. Normalmente toma menos de una hora en horario de tienda.</div></div>` : ''}
+      ${result === 'cancelado' && info.status !== 'EnRevision' ? `<div class="alert info">${icon('info')}<div><strong>No se hizo ningún cobro.</strong> Cancelaste el pago en PixelPay; puedes intentarlo de nuevo cuando quieras.</div></div>` : ''}
+      ${result === 'error' && info.status !== 'EnRevision' ? `<div class="alert err">${icon('alert')}<div><strong>No pudimos confirmar el pago con PixelPay.</strong> Si se hizo el cargo a tu tarjeta, escríbenos y lo revisamos; si no, intenta de nuevo.</div></div>` : ''}
       ${last?.status === 'Rechazado' ? `<div class="alert err">${icon('alert')}<div><strong>No pudimos confirmar tu pago anterior.</strong> ${esc(last.notes || '')}</div></div>` : ''}
 
       ${info.status !== 'EnRevision' ? `
@@ -97,8 +101,8 @@ export async function renderInscription(view, ctx) {
     const m = view.querySelector('input[name=m]:checked')?.value;
     box.innerHTML = m === 'card' ? (info.card.provider === 'pixelpay' ? `<div class="fake-gateway stack">
         <div class="row between"><strong>${esc(info.card.name)}</strong>${icon('shield')}</div>
-        <p class="small muted" style="margin:0">Pagas con Visa o Mastercard en la página segura de PixelPay. Los datos de tu tarjeta van cifrados directo a PixelPay: nosotros no los vemos ni los guardamos.</p>
-        <button class="btn primary lg block" id="pay-card">${icon('card')} Pagar ${money(info.feeHnl)}</button></div>`
+        <p class="small muted" style="margin:0">Te llevamos a la página segura de PixelPay para pagar con Visa o Mastercard. Escribes tu tarjeta allá: nosotros no la vemos ni la guardamos. Al terminar vuelves aquí.</p>
+        <button class="btn primary lg block" id="pay-card">${icon('card')} Pagar ${info.card.currency === 'USD' ? usd(info.feeUsd) : money(info.feeHnl)} con PixelPay</button></div>`
       : `<div class="fake-gateway stack">
         <div class="row between"><strong>${esc(info.card.name)}</strong><span class="badge st-EnRevision plain">MODO DE PRUEBA</span></div>
         <p class="small muted" style="margin:0">Pasarela simulada de desarrollo: el pago se aprueba sin cobrar. En el servidor real se usa PixelPay.</p>
@@ -108,11 +112,12 @@ export async function renderInscription(view, ctx) {
         <label class="field"><span>Número de referencia o comprobante</span><input name="reference" required maxlength="80" placeholder="Ej.: 123456789"></label>
         <button class="btn primary lg block">Enviar para verificación</button></form>`;
     box.querySelector('#pay-card')?.addEventListener('click', async (e) => {
-      e.currentTarget.disabled = true;
+      const btn = e.currentTarget; // después del await, e.currentTarget ya es null
+      btn.disabled = true;
       const r = await attempt(() => api.post('/registration/card'));
       if (r?.checkoutUrl) { location.href = r.checkoutUrl; return; }
       if (r?.approved) { await loadSession(); ctx.refreshBar(); toast('¡Pago aprobado! Tu cuenta está activa.'); renderInscription(view, ctx); }
-      else e.currentTarget.disabled = false;
+      else btn.disabled = false;
     });
     box.querySelector('#pay-transfer')?.addEventListener('submit', async (e) => {
       e.preventDefault();

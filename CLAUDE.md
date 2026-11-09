@@ -56,11 +56,14 @@ Datos locales en `src/Diversify.Delivery/data/` (ignorado por git).
 - Precios con ISV incluido. Total = subtotal (con lo realmente despachado) + envío (gratis desde
   `FreeDeliveryFrom`). Pedido mínimo sin envío.
 - **Código de entrega**: lo ven cliente y master; `ToDto(o, includePin: false)` para el repartidor. No romper.
-- Datos de tarjeta: **nunca** en esta app. Inscripción (pago único US$5) con **PixelPay**: SDK oficial en el
-  navegador (`js/vendor/pixelpay-sdk.js`, página `/pago/` con su propia CSP), verificación en
-  `Modules/PixelPay.cs` (hash + consulta de estado). Ver `docs/PIXELPAY.md`. Prueba: `tests/pago-pixelpay.cjs`.
+- Datos de tarjeta: **nunca** en esta app. Inscripción (pago único US$5) con **PixelPay Hosted Payment**: el
+  servidor crea la orden firmada (HMAC SHA3-512) y el cliente paga en la página de PixelPay; se verifica
+  `payment_hash` al regresar (`/api/pixelpay/registro/{id}/completo`) y en el aviso (`/api/pixelpay/aviso`).
+  Código: `Modules/PixelPay.cs` + `RegistrationEndpoints`. Ver `docs/PIXELPAY.md` y la Decisión 005. Prueba:
+  `tests/pago-pixelpay.cjs`. Hay un MCP de la documentación de PixelPay: consúltalo antes de cambiar el cobro.
 - Productos de Diversify POS: `Source = Diversify`, `DiversifyId`. Cambiar el precio a mano → `PriceLocked`.
 
+- Dirección pública (correos, regreso de PixelPay): `HostingSecurity.PublicBaseUrl` (`App:PublicUrl`).
 - Recuperar contraseña: `Modules/PasswordResetEndpoints.cs` (tabla `PasswordResets`, solo el SHA-256 del enlace,
   1 hora, un uso, máx. 3 por hora). Correos con `Core/Email.cs` (`IEmailSender`, SMTP de `Email:*`; sin `Email:Host`
   se guardan en `data/correos/*.eml`). Prueba: `tests/recuperar-contrasena.cjs`.

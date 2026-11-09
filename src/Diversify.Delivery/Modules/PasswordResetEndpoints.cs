@@ -58,10 +58,7 @@ public static class PasswordResetEndpoints
             await db.SaveChangesAsync(ct);
 
             var store = (await db.Settings.AsNoTracking().OrderBy(x => x.Id).FirstAsync(ct)).StoreName;
-            // Dirección pública de la tienda: App:PublicUrl (recomendado en el servidor) o la de la petición.
-            var configured = config["App:PublicUrl"];
-            var baseUrl = (string.IsNullOrWhiteSpace(configured) ? $"{http.Request.Scheme}://{http.Request.Host}" : configured).TrimEnd('/');
-            var link = $"{baseUrl}/#/restablecer/{token}";
+            var link = $"{HostingSecurity.PublicBaseUrl(config, http)}/#/restablecer/{token}";
             try
             {
                 await email.SendAsync(BuildEmail(user, store, link), ct);

@@ -61,7 +61,7 @@ node tests/e2e-capturas.cjs
 
 Recorre el flujo completo (registro → inscripción → carrito → pedido con GPS → master lo arma → repartidor lo
 entrega con el código) y guarda las capturas en `docs/capturas/`. `tests/pago-pixelpay.cjs` prueba el cobro con
-el SDK de PixelPay contra un PixelPay simulado. Ver [tests/README.md](tests/README.md).
+PixelPay (Hosted Payment) contra un PixelPay simulado. Ver [tests/README.md](tests/README.md).
 También: `dotnet build`, `node --check` en cada `.js` y `shellcheck -S warning deploy/*.sh deploy/proxmox/*.sh`
 (los corre la integración continua de GitHub en `master` y `beta`).
 

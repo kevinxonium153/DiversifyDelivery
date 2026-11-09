@@ -6,3 +6,4 @@
 | [002](002%20Integracion%20por%20API%20con%20usuario%20bodega.md) | Integración con Diversify POS por su API, con un usuario de solo consulta |
 | [003](003%20Inscripcion%20con%20pasarela%20externa.md) | Inscripción de US$5 (pago único) con PixelPay o transferencia, sin datos de tarjeta en la app |
 | [004](004%20Codigo%20de%20entrega.md) | Código de entrega de 4 dígitos que solo ve el cliente |
+| [005](005%20PixelPay%20Hosted%20Payment.md) | PixelPay con Hosted Payment: el cliente paga en la página de PixelPay; orden firmada en el servidor |

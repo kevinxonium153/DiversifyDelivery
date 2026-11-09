@@ -49,8 +49,7 @@ var app = builder.Build();
 
 app.UseForwardedHeaders();
 app.UseMiddleware<ErrorHandlingMiddleware>();
-var pixelPay = app.Services.GetRequiredService<PixelPayService>();
-app.UseSecurityHeaders(pixelPay.Configured ? pixelPay.Origin : null);
+app.UseSecurityHeaders();
 app.UseDefaultFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
