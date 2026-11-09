@@ -1,6 +1,7 @@
 // Regresión S05: inicia y detiene SU app en un puerto libre y una base demo desechable.
 // Requiere dotnet build src/Diversify.Delivery, Node 22+ y python3 (para simular vencimiento/migración).
 const assert = require('node:assert/strict');
+const { csrfFetch } = require('./api-csrf.cjs');
 const { spawn, execFileSync } = require('node:child_process');
 const { once } = require('node:events');
 const fs = require('node:fs');
@@ -12,7 +13,7 @@ const dll = path.join(app, 'bin', 'Debug', 'net10.0', 'Diversify.Delivery.dll');
 let child, base, logs = '', checks = 0, data;
 function check(actual, expected, message) { assert.deepEqual(actual, expected, message); checks++; }
 async function req(method, url, body, cookie = '', expected = 200) {
-  const r = await fetch(base + '/api' + url, { method, headers: { 'Content-Type': 'application/json', Cookie: cookie },
+  const r = await csrfFetch(base, '/api' + url, { method, headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: body === undefined ? undefined : JSON.stringify(body) });
   check(r.status, expected, `${method} ${url}: estado incorrecto`);
   const text = await r.text();

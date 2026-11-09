@@ -28,7 +28,10 @@
 - [x] S03: cupo, número e inserción en la misma transacción SQLite. Ocho ráfagas de ocho solicitudes con
       0/1/2/3 pendientes conservan el máximo de tres. Suite S01/S02/S03: 580 comprobaciones correctas.
       Detalle en `docs/SOLUCION-SEGURIDAD-S03.md`.
-- [ ] S04: protección antiforgery en operaciones autenticadas con efectos; validar orígenes como defensa adicional.
+- [x] S04: token antiforgery obligatorio en escrituras de /api, validación de Origin/Fetch Metadata y cliente
+      JavaScript integrado, incluidos login, logout y POST sin cuerpo. Única excepción POST: aviso firmado de
+      PixelPay. Ataque real con cookie desde otro origen bloqueado sin cambios en el pedido; 58 comprobaciones.
+      Ver `docs/SOLUCION-SEGURIDAD-S04.md` y el inventario `docs/BUGS-SEGURIDAD.md`.
 - [x] S05: sesiones revocables persistidas en SQLite, verificación por petición sin caché de revocación,
       rotación en inicios de sesión explícitos y caducidad. 71 comprobaciones, incluidos reinicios y actualización
       de base existente. Ver `docs/SOLUCION-SEGURIDAD-S05.md`. Al desplegar, las cookies anteriores deben iniciar
@@ -41,7 +44,7 @@
 - [ ] Generar PIN con criptografía y limitar intentos por pedido/cuenta.
 - [x] Advertencia CS9113 (`httpFactory` sin usar) ya corregida en beta antes de integrar S01;
       compilación con `-warnaserror` verificada sin advertencias.
-- [ ] Desplegar S01 y repetir la validación en el entorno publicado; revisar atribuciones de pedidos históricos
+- [ ] Desplegar S01–S05 y repetir la validación en el entorno publicado; revisar atribuciones de pedidos históricos
       que pudieran haber sido alteradas antes de la corrección, sin reconstruirlas automáticamente.
 - [ ] Retomar guardado de la configuración reutilizable del entorno: la plataforma no confirmó el borrador.
 

@@ -1,6 +1,7 @@
 // Cliente HTTP para la API de Diversify Delivery. Todas las rutas son relativas a /api.
 
 let onUnauthorized = () => {};
+let csrfToken;
 export function setUnauthorizedHandler(fn) { onUnauthorized = fn; }
 
 function queryString(params) {
@@ -16,15 +17,26 @@ function queryString(params) {
 async function request(method, url, body) {
   let res;
   try {
+    const headers = body !== undefined ? { 'Content-Type': 'application/json' } : {};
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      // Compartir la primera carga evita crear cookies antiforgery distintas en escrituras paralelas.
+      csrfToken ??= fetch('/api/auth/csrf', { credentials: 'same-origin', cache: 'no-store' }).then(async (r) => {
+        if (!r.ok) throw new Error('No se pudo preparar la solicitud. Recarga la página.');
+        return (await r.json()).requestToken;
+      }).catch((e) => { csrfToken = undefined; throw e; });
+      headers['X-CSRF-TOKEN'] = await csrfToken;
+    }
     res = await fetch(`/api${url}`, {
       method,
       credentials: 'same-origin',
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+      headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new Error('Sin conexión. Revisa tu internet e inténtalo de nuevo.');
   }
+  if (res.status === 401 || (url === '/auth/me' && res.status === 204) || res.headers.get('X-CSRF-Error') ||
+      (res.ok && /^\/auth\/(login|register|logout|reset|profile)$/.test(url))) csrfToken = undefined;
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* respuesta no JSON */ }

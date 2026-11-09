@@ -66,4 +66,4 @@ no usar con datos reales. No se desactivan las validaciones de negocio ni se cam
 La entrega se realiza en beta. El push no despliega producción. Tras desplegar, verificar el límite con cuentas de
 prueba y revisar si existen clientes con excedentes anteriores. La idempotencia de la creación ante reenvíos de
 red es una mejora adicional: este cambio garantiza el cupo, no identifica dos solicitudes como el mismo pedido.
-Posteriormente se corrigió S05; los hallazgos S04, S06, S07 y S08 siguen pendientes en notas/Pendientes.md.
+Posteriormente se corrigieron S04 y S05; los hallazgos S06, S07 y S08 siguen pendientes en notas/Pendientes.md.

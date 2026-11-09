@@ -117,7 +117,7 @@ la configuración normal de la app no cambia. La suite ya está incorporada al C
 Una petición que ya fue autenticada antes de logout puede terminar su trabajo; logout no cancela operaciones
 en vuelo. En la prueba concurrente esas respuestas podían ser 200 o 401, pero toda solicitud posterior al cierre
 se rechaza y no se recrea la sesión. La función cierra la sesión actual, sin añadir una pantalla de “cerrar todos
-los equipos”. No se trata de una corrección CSRF: ese hallazgo S04 sigue pendiente.
+los equipos”. La corrección CSRF se implementó por separado en S04; ver docs/SOLUCION-SEGURIDAD-S04.md.
 
 También siguen pendientes S06 (transferencias sin límite), S07 (método de pago inválido), S08 (validación de
 imágenes) y los asuntos de operación/producto de notas/Pendientes.md. El push a beta no despliega producción

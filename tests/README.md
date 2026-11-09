@@ -1,5 +1,23 @@
 # Pruebas
 
+## Protección CSRF (`seguridad-csrf.cjs`)
+
+```bash
+dotnet build src/Diversify.Delivery -warnaserror
+npm install --no-save playwright@1.49.1
+npx playwright install --with-deps chromium
+node tests/seguridad-csrf.cjs
+```
+
+Arranca su propia app demo en un puerto libre y una base en `test-results/csrf-*`; no usa producción.
+Comprueba 58 condiciones: token ausente/falso, cookie o identidad incorrectas, origen distinto incluso con
+token válido, Fetch Metadata, POST sin cuerpo, PUT/DELETE, login/logout, aviso de PixelPay y flujo legítimo.
+En Chromium abre otro origen del mismo sitio, verifica con CDP que envió la cookie de la víctima y comprueba
+que el pedido completo quedó intacto. También comprueba que el frontend no reintenta una escritura rechazada.
+
+Los clientes HTTP de las otras suites usan `api-csrf.cjs`: obtienen tokens reales y conservan la cookie
+antiforgery. No hay bypass de la protección en pruebas. El simulador de PixelPay conserva sus avisos firmados.
+
 ## Sesiones revocables (`seguridad-sesiones.cjs`)
 
 Regresión S05: copia de cookie tras logout, independencia entre equipos, rotación al editar perfil, cambio de

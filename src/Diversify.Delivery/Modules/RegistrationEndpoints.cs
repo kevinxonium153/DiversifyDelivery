@@ -217,7 +217,7 @@ public static class RegistrationEndpoints
             }
             await db.SaveChangesAsync(ct);
             return Results.Ok(new { received = true });
-        });
+        }).WithMetadata(new PixelPayNotificationCsrfExemption());
 
         // ---------- Master: revisar transferencias ----------
         var admin = api.MapGroup("/admin/registrations").RequireRoles(Roles.Master);

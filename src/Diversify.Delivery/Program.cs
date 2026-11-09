@@ -3,6 +3,7 @@ using Diversify.Delivery.Core;
 using Diversify.Delivery.Modules;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 
 // Diversify Delivery: catálogo en línea + pedidos a domicilio del supermercado.
@@ -44,6 +45,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddAntiforgery(o =>
+{
+    o.HeaderName = CsrfProtectionMiddleware.HeaderName;
+    o.Cookie.Name = "diversify.csrf";
+    o.Cookie.HttpOnly = true;
+    o.Cookie.SameSite = SameSiteMode.Strict;
+    o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
+});
 
 var app = builder.Build();
 
@@ -55,14 +64,21 @@ app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
 });
+app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+app.UseMiddleware<CsrfProtectionMiddleware>();
 
 app.MapGet("/healthz", async (DeliveryDbContext db) =>
     await db.Database.CanConnectAsync() ? Results.Ok(new { status = "ok" }) : Results.StatusCode(503));
 
 var api = app.MapGroup("/api");
+api.MapGet("/auth/csrf", (HttpContext http, IAntiforgery antiforgery) =>
+{
+    if (!CsrfProtectionMiddleware.IsSameOrigin(http.Request)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+    return Results.Ok(new { requestToken = antiforgery.GetAndStoreTokens(http).RequestToken });
+}).RequireRateLimiting(HostingSecurity.PublicLimit);
 AuthEndpoints.Map(api);
 PasswordResetEndpoints.Map(api);
 RegistrationEndpoints.Map(api);

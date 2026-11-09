@@ -10,6 +10,7 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { csrfFetch } = require('./api-csrf.cjs');
 
 const BASE = process.env.BASE || 'http://localhost:5390';
 const MAIL = path.join(__dirname, '..', 'src', 'Diversify.Delivery', 'data', 'correos');
@@ -38,7 +39,7 @@ async function newMail(before) {
   }
   throw new Error('No llegó el correo');
 }
-const post = (url, body, cookie = '') => fetch(BASE + url, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify(body) });
+const post = (url, body, cookie = '') => csrfFetch(BASE, url, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify(body) });
 
 async function page(browser) {
   const p = await (await browser.newContext(PHONE)).newPage();

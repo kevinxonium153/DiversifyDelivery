@@ -11,7 +11,8 @@ La corrección está integrada sobre beta (base 2d55812) y comprobada. No se ha 
 Actualización: también se corrigió S02 (asignación simultánea); ver `docs/SOLUCION-SEGURIDAD-S02.md`.
 También se corrigió S03 (límite de pendientes); ver `docs/SOLUCION-SEGURIDAD-S03.md`.
 También se corrigió S05 (revocación al cerrar sesión); ver `docs/SOLUCION-SEGURIDAD-S05.md`.
-Los otros cuatro hallazgos de seguridad (S04, S06, S07 y S08) siguen pendientes.
+También se corrigió S04 (CSRF); ver `docs/SOLUCION-SEGURIDAD-S04.md`.
+Los otros tres hallazgos de seguridad (S06, S07 y S08) siguen pendientes.
 El inventario completo de pendientes de seguridad, operación, producto y decisiones está en notas/Pendientes.md;
 el PDF `docs/Solucion_S01_y_todos_los_pendientes.pdf` incorpora ese inventario, incluyendo los avances existentes
 en beta de PixelPay y recuperación de contraseña.

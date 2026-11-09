@@ -1,6 +1,7 @@
 // Regresiones S01, S02 y S03. Solo en una instancia local desechable con usuarios y pagos demo.
 // ALLOW_DEMO_MUTATIONS=1 BASE=http://127.0.0.1:5493 node tests/seguridad-repartidor.cjs
 const assert = require('node:assert/strict');
+const { csrfFetch } = require('./api-csrf.cjs');
 const BASE = process.env.BASE || 'http://localhost:5390';
 assert(['localhost', '127.0.0.1', '[::1]'].includes(new URL(BASE).hostname), 'Usa una instancia local desechable.');
 assert.equal(process.env.ALLOW_DEMO_MUTATIONS, '1', 'Confirma base demo desechable con ALLOW_DEMO_MUTATIONS=1.');
@@ -8,7 +9,7 @@ let checks = 0;
 function client() {
   let cookie;
   return async (method, path, data, expected = 200) => {
-    const r = await fetch(BASE + '/api' + path, { method,
+    const r = await csrfFetch(BASE, '/api' + path, { method,
       headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
       body: data === undefined ? undefined : JSON.stringify(data),
     });
