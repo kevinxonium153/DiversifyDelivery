@@ -22,6 +22,7 @@ export function renderLogin(view, ctx) {
       <label class="field"><span>Correo o usuario</span><input name="login" autocomplete="username" required></label>
       <label class="field"><span>Contraseña</span><input name="password" type="password" autocomplete="current-password" required></label>
       <button class="btn primary lg block">Ingresar</button>
+      <a class="small" href="#/recuperar" style="text-align:center">¿Olvidaste tu contraseña?</a>
       <p class="small muted" style="text-align:center;margin:0">¿No tienes cuenta? <a href="#/registro">Crea una aquí</a></p>
     </form></div>`;
   view.querySelector('#login').addEventListener('submit', async (e) => {
@@ -174,5 +175,57 @@ export async function renderAccount(view, ctx) {
     state.user = null;
     ctx.refreshBar();
     ctx.navigate('#/');
+  });
+}
+
+export function renderForgot(view) {
+  view.innerHTML = `<div class="auth-wrap" style="min-height:auto;padding-top:20px">
+    <form class="auth-card glass" id="forgot">
+      <div class="brand">${logoDelivery({ height: 48 })}<h1 style="font-size:22px;margin:10px 0 0">¿Olvidaste tu contraseña?</h1>
+        <p class="muted small" style="margin:0">Escribe el correo con el que te registraste y te enviamos un enlace para crear una nueva.</p></div>
+      <label class="field"><span>Correo electrónico</span><input name="email" type="email" autocomplete="email" required maxlength="120"></label>
+      <button class="btn primary lg block">Enviar enlace</button>
+      <a class="small" href="#/ingresar" style="text-align:center">Volver a ingresar</a>
+    </form></div>`;
+  view.querySelector('#forgot').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    const r = await attempt(() => api.post('/auth/forgot', formData(e.target)));
+    btn.disabled = false;
+    if (!r) return;
+    e.target.innerHTML = `<div class="brand">${logoDelivery({ height: 48 })}</div>
+      <div style="text-align:center;display:grid;gap:10px"><div style="font-size:48px">📧</div><h1 style="font-size:22px;margin:0">Revisa tu correo</h1>
+      <p class="muted" style="margin:0">${esc(r.message)}</p><p class="small muted" style="margin:0">El enlace vence en 1 hora.</p></div>
+      <a class="btn block" href="#/ingresar">Volver a ingresar</a>`;
+  });
+}
+
+export async function renderReset(view, ctx, token) {
+  let info;
+  try { info = await api.get(`/auth/reset/${encodeURIComponent(token)}`); } catch (err) {
+    view.innerHTML = `<div class="auth-wrap" style="min-height:auto;padding-top:20px"><div class="auth-card glass">
+      <div class="brand">${logoDelivery({ height: 48 })}</div>
+      <div class="alert warn">${icon('clock')}<div>${esc(err.message)}</div></div>
+      <a class="btn primary lg block" href="#/recuperar">Pedir un enlace nuevo</a></div></div>`;
+    return;
+  }
+  view.innerHTML = `<div class="auth-wrap" style="min-height:auto;padding-top:20px">
+    <form class="auth-card glass" id="reset">
+      <div class="brand">${logoDelivery({ height: 48 })}<h1 style="font-size:22px;margin:10px 0 0">Hola ${esc(info.name)}, crea tu contraseña nueva</h1></div>
+      <label class="field"><span>Contraseña nueva (mínimo 8 caracteres)</span><input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label class="field"><span>Repite la contraseña</span><input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label>
+      <button class="btn primary lg block">Guardar e ingresar</button>
+      <p class="small muted" style="text-align:center;margin:0">Por seguridad, se cerrará tu sesión en los otros equipos.</p>
+    </form></div>`;
+  view.querySelector('#reset').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = formData(e.target);
+    if (f.password !== f.confirm) { toast('Las contraseñas no coinciden.', 'error'); return; }
+    const user = await attempt(() => api.post('/auth/reset', { token, password: f.password }), 'Contraseña cambiada. ¡Bienvenido de nuevo!');
+    if (!user) return;
+    state.user = user;
+    ctx.refreshBar();
+    afterLogin(ctx);
   });
 }

@@ -22,6 +22,7 @@ function renderLogin(message = '') {
     <label class="field"><span>Usuario</span><input name="login" autocomplete="username" required></label>
     <label class="field"><span>Contraseña</span><input name="password" type="password" autocomplete="current-password" required></label>
     <button class="btn primary lg block">Ingresar</button>
+    <p class="small muted" style="text-align:center;margin:0">¿Olvidaste tu contraseña? Pídele al otro usuario master que te asigne una nueva.</p>
     ${polyMorphaCredit()}
   </form></div>`;
   root.querySelector('#login').addEventListener('submit', async (e) => {

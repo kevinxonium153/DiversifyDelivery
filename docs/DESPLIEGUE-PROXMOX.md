@@ -56,6 +56,31 @@ Ver [INTEGRACION-DIVERSIFY.md](INTEGRACION-DIVERSIFY.md). En resumen: crear en D
 Ver [PIXELPAY.md](PIXELPAY.md): completar las líneas `PixelPay__*` en `/etc/diversify-delivery/delivery.env` con
 los datos del portal de PixelPay del comercio y reiniciar el servicio.
 
+## 3c. Configurar el correo (recuperar contraseña)
+
+Sin correo, los clientes que olvidan su contraseña no pueden entrar. Sirve cualquier servidor SMTP:
+
+| Opción | Costo | Notas |
+|---|---|---|
+| **Brevo** (antes Sendinblue) | Gratis hasta 300 correos/día | Recomendado. Verificar el dominio para que no caiga en spam. |
+| **Gmail / Google Workspace** | Gratis / incluido | Usar una "contraseña de aplicación", no la contraseña normal. |
+| Correo del dominio (cPanel, etc.) | Según el hosting | Puerto 587 con TLS. |
+
+En `/etc/diversify-delivery/delivery.env` descomenta y completa:
+
+```ini
+Email__Host=smtp-relay.brevo.com
+Email__Port=587
+Email__User=usuario-smtp
+Email__Password=llave-smtp
+Email__From="Súper La Esperanza <no-responder@delivery.diversify.hn>"
+```
+
+`systemctl restart diversify-delivery` y prueba en la tienda: Ingresar → ¿Olvidaste tu contraseña?
+`App__PublicUrl` (lo pone el instalador) es la dirección que va en el enlace del correo.
+Si el correo falla, queda en `journalctl -u diversify-delivery` ("No se pudo enviar el correo de recuperación").
+Master y repartidores no usan este enlace: un usuario master les asigna la contraseña nueva en el panel.
+
 ## 4. Primeros pasos en el panel
 
 1. **Ajustes:** nombre del súper, horario, costo de envío, pedido mínimo, envío gratis, monto de la inscripción,

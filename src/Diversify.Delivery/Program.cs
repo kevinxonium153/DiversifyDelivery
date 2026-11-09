@@ -25,6 +25,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddSingleton<PixelPayService>();
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddSingleton<DiversifySyncService>();
 builder.Services.AddHostedService<DiversifySyncWorker>();
 
@@ -64,6 +65,7 @@ app.MapGet("/healthz", async (DeliveryDbContext db) =>
 
 var api = app.MapGroup("/api");
 AuthEndpoints.Map(api);
+PasswordResetEndpoints.Map(api);
 RegistrationEndpoints.Map(api);
 CatalogEndpoints.Map(api);
 Orders.Map(api);
@@ -71,5 +73,8 @@ AdminEndpoints.Map(api);
 DiversifySyncEndpoints.Map(api);
 
 await DbInitializer.InitializeAsync(app.Services, app.Configuration);
+
+if (!app.Environment.IsDevelopment() && !app.Services.GetRequiredService<IEmailSender>().Configured)
+    app.Logger.LogWarning("Sin servidor de correo (Email:Host): los clientes no podrán recuperar su contraseña. Ver docs/DESPLIEGUE-PROXMOX.md.");
 
 app.Run();

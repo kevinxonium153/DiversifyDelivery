@@ -206,6 +206,21 @@ public class RegistrationPayment
     public DateTime? ReviewedAt { get; set; }
 }
 
+/// <summary>
+/// Solicitud de "olvidé mi contraseña". Solo se guarda el SHA-256 del enlace (si alguien copia la base, no puede
+/// usar los enlaces). Vence en 1 hora y sirve una sola vez.
+/// </summary>
+public class PasswordReset
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public string TokenHash { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime ExpiresAt { get; set; }
+    public DateTime? UsedAt { get; set; }
+    public string? RequestIp { get; set; }
+}
+
 /// <summary>Ajustes de la tienda (una sola fila, Id = 1). Los edita el master.</summary>
 public class StoreSettings
 {

@@ -61,6 +61,10 @@ Datos locales en `src/Diversify.Delivery/data/` (ignorado por git).
   `Modules/PixelPay.cs` (hash + consulta de estado). Ver `docs/PIXELPAY.md`. Prueba: `tests/pago-pixelpay.cjs`.
 - Productos de Diversify POS: `Source = Diversify`, `DiversifyId`. Cambiar el precio a mano → `PriceLocked`.
 
+- Recuperar contraseña: `Modules/PasswordResetEndpoints.cs` (tabla `PasswordResets`, solo el SHA-256 del enlace,
+  1 hora, un uso, máx. 3 por hora). Correos con `Core/Email.cs` (`IEmailSender`, SMTP de `Email:*`; sin `Email:Host`
+  se guardan en `data/correos/*.eml`). Prueba: `tests/recuperar-contrasena.cjs`.
+
 ## Frontend (`wwwroot`)
 
 - Sin build, sin npm, sin CDNs (la CSP lo bloquea). ES modules.

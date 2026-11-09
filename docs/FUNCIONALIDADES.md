@@ -71,6 +71,12 @@ Escritorio, claro y oscuro:
 - **Seguimiento en vivo** (se actualiza solo): barra de estados, historial, datos del repartidor con botones para
   llamar o escribir por WhatsApp, productos que no había (no se cobran) y **código de entrega**.
 - Puede cancelar mientras el pedido no se empieza a armar.
+- **¿Olvidaste tu contraseña?** Recibe por correo un enlace (vence en 1 hora, sirve una vez) para crear una nueva;
+  al cambiarla se cierran sus sesiones en otros equipos. La respuesta no revela si un correo tiene cuenta.
+
+| Pedir el enlace | Correo que recibe | Contraseña nueva |
+|---|---|---|
+| ![](capturas/50-recuperar-contrasena.png) | ![](capturas/52-correo-recuperacion.png) | ![](capturas/51-contrasena-nueva.png) |
 - Horario de pedidos y pausa de la tienda (el master la controla).
 
 ## 2. Panel del master

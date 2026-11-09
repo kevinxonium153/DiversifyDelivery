@@ -36,6 +36,9 @@ jobs:
           pkill -f "Diversify.Delivery" || true
           rm -rf src/Diversify.Delivery/data
           PixelPay__Endpoint=http://localhost:5399 PixelPay__Key=prueba-key PixelPay__SecretKey=prueba-secreto \
+            Security__LoginAttemptsPerMinute=100 \
             dotnet run --project src/Diversify.Delivery --launch-profile http > server-pixelpay.log 2>&1 &
           for i in $(seq 1 60); do curl -fs http://localhost:5390/healthz && break; sleep 1; done
           CAPTURAS=0 node tests/pago-pixelpay.cjs
+      - name: Recuperar contraseña por correo
+        run: CAPTURAS=0 node tests/recuperar-contrasena.cjs

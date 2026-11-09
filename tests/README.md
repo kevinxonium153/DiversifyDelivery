@@ -36,3 +36,15 @@ node tests/pago-pixelpay.cjs
 ```
 
 El simulado arranca solo dentro de la prueba (puerto 5399).
+
+## Recuperar contraseña (`recuperar-contrasena.cjs`)
+
+Sin servidor de correo, la app guarda los correos en `src/Diversify.Delivery/data/correos/*.eml`; la prueba toma el
+enlace de ahí. Revisa: no revela si un correo tiene cuenta, el enlace llega y funciona, la contraseña anterior deja
+de servir, se cierra la sesión de otro equipo, el enlace no sirve dos veces, uno nuevo invalida el anterior y el
+máximo de 3 correos por hora.
+
+```bash
+Security__LoginAttemptsPerMinute=100 dotnet run --project src/Diversify.Delivery --launch-profile http &
+node tests/recuperar-contrasena.cjs
+```

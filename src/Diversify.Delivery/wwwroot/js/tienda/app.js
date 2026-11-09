@@ -7,7 +7,7 @@ import { renderCatalog } from './catalog.js';
 import { openCart } from './cart.js';
 import { renderCheckout } from './checkout.js';
 import { renderOrders, renderOrder } from './orders.js';
-import { renderLogin, renderRegister, renderInscription, renderAccount } from './account.js';
+import { renderLogin, renderRegister, renderInscription, renderAccount, renderForgot, renderReset } from './account.js';
 
 const view = document.getElementById('view');
 let cleanup = null;
@@ -25,6 +25,8 @@ const routes = [
   [/^#\/ofertas$/, () => renderCatalog(view, ctx, { offers: true })],
   [/^#\/ingresar$/, () => renderLogin(view, ctx)],
   [/^#\/registro$/, () => renderRegister(view, ctx)],
+  [/^#\/recuperar$/, () => renderForgot(view, ctx)],
+  [/^#\/restablecer\/([A-Za-z0-9_-]+)$/, (m) => renderReset(view, ctx, m[1])],
   [/^#\/inscripcion$/, () => needUser() && renderInscription(view, ctx)],
   [/^#\/cuenta$/, () => needUser() && renderAccount(view, ctx)],
   [/^#\/checkout$/, () => needUser() && renderCheckout(view, ctx)],
@@ -82,7 +84,7 @@ function renderBar() {
 function renderCartBar() {
   const el = document.getElementById('cartbar');
   const t = cartTotals();
-  const hide = !t.count || /^#\/(checkout|pedido|ingresar|registro|inscripcion)/.test(location.hash);
+  const hide = !t.count || /^#\/(checkout|pedido|ingresar|registro|inscripcion|recuperar|restablecer)/.test(location.hash);
   el.innerHTML = hide ? '' : `<div class="cartbar"><button class="btn primary" id="open-cart">
     <span class="row">${icon('cart')} Ver carrito · ${t.count} ${t.count === 1 ? 'producto' : 'productos'}</span><strong>${money(t.subtotal)}</strong></button></div>`;
   el.querySelector('#open-cart')?.addEventListener('click', () => openCart(ctx));

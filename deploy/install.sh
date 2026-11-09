@@ -116,6 +116,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo "ASPNETCORE_URLS=http://127.0.0.1:${PORT}"
     echo "AllowedHosts=\"${DOMAIN};localhost;127.0.0.1\""
     echo "Storage__DataRoot=${DATA}"
+    echo "App__PublicUrl=https://${DOMAIN}"
     echo "TZ=America/Tegucigalpa"
     echo "DOTNET_CLI_TELEMETRY_OPTOUT=1"
     echo
@@ -128,6 +129,14 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo
     echo "# Pasarela de pago de la inscripción. En producción nunca la simulada."
     echo "Payments__Simulated=false"
+    echo
+    echo "# Correo (recuperar contraseña). Cualquier SMTP: Gmail, Brevo, el del dominio."
+    echo "# Descomenta, completa y: systemctl restart diversify-delivery"
+    echo "#Email__Host=smtp-relay.brevo.com"
+    echo "#Email__Port=587"
+    echo "#Email__User=usuario-smtp"
+    echo "#Email__Password=contraseña-o-llave-smtp"
+    echo "#Email__From=\"Mi supermercado <no-responder@${DOMAIN}>\""
     echo
     echo "# PixelPay (cobro de la inscripción con tarjeta). Datos del portal de PixelPay del comercio."
     echo "# La llave secreta nunca sale de este servidor. Descomenta, completa y: systemctl restart diversify-delivery"

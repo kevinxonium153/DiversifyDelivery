@@ -26,7 +26,8 @@
 - [ ] Mapa dentro de la app para marcar la ubicación (hoy: GPS del celular + enlaces a Google Maps/Waze).
       Requiere decidir proveedor de mapas (y permitir su dominio en la CSP).
 - [ ] Notificaciones push / WhatsApp de cambios de estado.
-- [ ] Recuperar contraseña por correo (requiere servidor de correo).
+- [x] Recuperar contraseña por correo (enlace de 1 hora y un solo uso; prueba automática).
+- [ ] Elegir el servicio de correo (Brevo, Gmail…) y configurarlo en el servidor (`Email__*`).
 - [ ] Enviar el pedido entregado a Diversify POS como venta (ver pregunta 4).
 - [ ] EF Core Migrations (hoy `EnsureCreated` + `SchemaUpgrades`, igual que Diversify POS).
 - [ ] Términos y condiciones y aviso de privacidad (texto legal).

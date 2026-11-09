@@ -14,6 +14,7 @@ public class DeliveryDbContext(DbContextOptions<DeliveryDbContext> options) : Db
     public DbSet<OrderEvent> OrderEvents => Set<OrderEvent>();
     public DbSet<RegistrationPayment> RegistrationPayments => Set<RegistrationPayment>();
     public DbSet<StoreSettings> Settings => Set<StoreSettings>();
+    public DbSet<PasswordReset> PasswordResets => Set<PasswordReset>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -108,6 +109,13 @@ public class DeliveryDbContext(DbContextOptions<DeliveryDbContext> options) : Db
             e.Property(x => x.Notes).HasMaxLength(300);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        model.Entity<PasswordReset>(e =>
+        {
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => x.UserId);
+            e.Property(x => x.TokenHash).HasMaxLength(64);
+            e.Property(x => x.RequestIp).HasMaxLength(64);
         });
         model.Entity<StoreSettings>(e =>
         {
