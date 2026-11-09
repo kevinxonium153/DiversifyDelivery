@@ -172,8 +172,6 @@ public static class Orders
             AppException.ThrowIf(!IsOpen(s), $"La tienda recibe pedidos de {s.OpensAt} a {s.ClosesAt}.");
             AppException.ThrowIf(input.Items is not { Count: > 0 }, "El carrito está vacío.");
             AppException.ThrowIf(input.Items.Count > 100, "Un pedido puede tener hasta 100 productos distintos.");
-            AppException.ThrowIf(await db.Orders.CountAsync(o => o.CustomerId == user.Id && o.Status == OrderStatus.Recibido) >= 3,
-                "Tienes 3 pedidos sin atender. Espera a que el supermercado los revise.");
 
             var addr = await db.Addresses.FirstOrDefaultAsync(a => a.Id == input.AddressId && a.UserId == user.Id)
                        ?? throw new AppException("Elige una dirección de entrega.");
@@ -208,8 +206,11 @@ public static class Orders
             }
             AddEvent(order, OrderStatus.Recibido, null, user.FullName);
 
-            // Número correlativo DD-000001 (dentro de una transacción para que no se repita).
+            // SQLite inicia esta transacción serializable sin diferir el bloqueo de escritura.
+            // Cupo, número e inserción quedan juntos: otra solicitud debe contar después del commit anterior.
             await using var tx = await db.Database.BeginTransactionAsync();
+            AppException.ThrowIf(await db.Orders.CountAsync(o => o.CustomerId == user.Id && o.Status == OrderStatus.Recibido) >= 3,
+                "Tienes 3 pedidos sin atender. Espera a que el supermercado los revise.");
             var last = await db.Orders.MaxAsync(o => (int?)o.Id) ?? 0;
             order.Number = $"DD-{last + 1:000000}";
             db.Orders.Add(order);

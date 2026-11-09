@@ -26,7 +26,8 @@ Si no cambia ninguna fila, se comprueba el resultado persistido:
 
 Las respuestas 409 solo incluyen el error, sin datos personales del pedido. El PIN continúa oculto al repartidor.
 El cliente existente muestra el mensaje devuelto por la API. No se cambió el esquema ni se alteraron asignaciones
-históricas. El resto de operaciones concurrentes y el máximo de pedidos (S03) requieren su propia corrección.
+históricas. El límite de pedidos se corrigió posteriormente en S03; ver `docs/SOLUCION-SEGURIDAD-S03.md`.
+El resto de operaciones concurrentes requiere su propia revisión.
 
 ## Verificación
 
@@ -38,7 +39,8 @@ Prueba tests/seguridad-repartidor.cjs, ya incluida en CI:
 - El perdedor no puede consultar ni liberar el pedido.
 - Dos reintentos paralelos del ganador mantienen idéntico el pedido completo: estado, fecha y eventos.
 - Liberación válida entre rondas y rechazo de toma de un pedido cancelado sin modificarlo.
-- Las regresiones previas de S01 se conservan. Resultado conjunto: 308 comprobaciones correctas.
+- Las regresiones previas de S01 se conservan. Resultado inicial S01/S02: 308 comprobaciones correctas;
+  la suite ampliada con S03 verifica ahora 580 comprobaciones.
 - Compilación con -warnaserror sin errores ni advertencias; JavaScript y ShellCheck correctos.
 
 Las pruebas se hicieron con datos demo aislados en localhost. La prueba de concurrencia falla contra la versión

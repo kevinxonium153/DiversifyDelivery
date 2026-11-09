@@ -1,4 +1,4 @@
-// Regresiones S01 y S02. Solo en una instancia local desechable con usuarios y pagos demo.
+// Regresiones S01, S02 y S03. Solo en una instancia local desechable con usuarios y pagos demo.
 // ALLOW_DEMO_MUTATIONS=1 BASE=http://127.0.0.1:5493 node tests/seguridad-repartidor.cjs
 const assert = require('node:assert/strict');
 const BASE = process.env.BASE || 'http://localhost:5390';
@@ -37,8 +37,8 @@ function client() {
     const p = items.find((x) => x.available && x.price > 0);
     assert(p, 'Se necesita un producto demo disponible.');
     const quantity = Math.max(1, Math.ceil(settings.minimumOrder / p.price) + 1);
-    const create = () => customer('POST', '/orders/', { addressId: address.id,
-      items: [{ productId: p.id, quantity }], paymentMethod: 'Efectivo' }, 201);
+    const orderInput = { addressId: address.id, items: [{ productId: p.id, quantity }], paymentMethod: 'Efectivo' };
+    const create = () => customer('POST', '/orders/', orderInput, 201);
     const inspect = (id) => master('GET', `/admin/orders/${id}`);
     async function deniedRelease(id, actor = driver, expected = 400) {
       const before = await inspect(id);
@@ -113,6 +113,35 @@ function client() {
     const closed = await inspect(contested.id);
     await driver('POST', `/driver/orders/${contested.id}/take`, undefined, 409);
     assert.deepEqual(await inspect(contested.id), closed); checks++;
+    // S03: el límite se verifica en la base después de cada ráfaga, no solo en las respuestas.
+    for (let round = 0; round < 8; round++) {
+      const initial = round % 4; // Dos rondas con 0, 1, 2 y 3 pedidos pendientes.
+      for (let i = 0; i < initial; i++) await create();
+      const before = await customer('GET', '/orders/');
+      assert.equal(before.filter((x) => x.status === 'Recibido').length, initial); checks++;
+      const outcomes = await Promise.all(Array.from({ length: 8 }, () => customer('POST', '/orders/', orderInput, [201, 400])));
+      const accepted = outcomes.filter((r) => r.status === 201).map((r) => r.body);
+      assert.equal(accepted.length, 3 - initial, 'Solo se pueden crear los pedidos que quepan en el cupo.'); checks++;
+      assert.equal(outcomes.filter((r) => r.status === 400).length, 5 + initial); checks++;
+      for (const rejected of outcomes.filter((r) => r.status === 400)) {
+        assert.match(rejected.body.error, /3 pedidos sin atender/, 'El rechazo debe ser por el límite, no por un error de base de datos.'); checks++;
+      }
+      let saved = await customer('GET', '/orders/');
+      assert.equal(saved.length, before.length + accepted.length, 'No se deben persistir pedidos rechazados.'); checks++;
+      let pending = saved.filter((x) => x.status === 'Recibido');
+      assert.equal(pending.length, 3, 'El número persistido no puede exceder tres.'); checks++;
+      assert.equal(new Set(saved.map((x) => x.number)).size, saved.length, 'Los números de pedido deben seguir siendo únicos.'); checks++;
+      // Cancelar y comenzar a preparar liberan cupo; un intento inválido no lo ocupa.
+      await customer('POST', `/orders/${pending[0].id}/cancel`, { reason: 'Regresión de cupo' });
+      await customer('POST', '/orders/', { ...orderInput, items: [] }, 400);
+      await create();
+      await master('POST', `/admin/orders/${pending[1].id}/status`, { status: 'Preparando' });
+      await create();
+      saved = await customer('GET', '/orders/');
+      pending = saved.filter((x) => x.status === 'Recibido');
+      assert.equal(pending.length, 3, 'Se debe poder reutilizar el cupo sin superar el límite.'); checks++;
+      for (const o of pending) await customer('POST', `/orders/${o.id}/cancel`, { reason: 'Fin de ronda de cupo' });
+    }
   } finally {
     await master('PUT', '/admin/settings', settings);
   }

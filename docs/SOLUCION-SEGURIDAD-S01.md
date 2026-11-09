@@ -9,7 +9,8 @@ que todavía estén Recibido o que estén cerrados; tampoco puede quitarse de pe
 La corrección está integrada sobre beta (base 2d55812) y comprobada. No se ha desplegado en producción.
 
 Actualización: también se corrigió S02 (asignación simultánea); ver `docs/SOLUCION-SEGURIDAD-S02.md`.
-Los otros seis hallazgos de seguridad (S03–S08) siguen pendientes.
+También se corrigió S03 (límite de pendientes); ver `docs/SOLUCION-SEGURIDAD-S03.md`.
+Los otros cinco hallazgos de seguridad (S04–S08) siguen pendientes.
 El inventario completo de pendientes de seguridad, operación, producto y decisiones está en notas/Pendientes.md;
 el PDF `docs/Solucion_S01_y_todos_los_pendientes.pdf` incorpora ese inventario, incluyendo los avances existentes
 en beta de PixelPay y recuperación de contraseña.
@@ -64,7 +65,7 @@ mostrados antes de aceptar una entrega es una decisión adicional de privacidad,
 - Compilación .NET 10 sobre beta con -warnaserror: correcta, sin advertencias ni errores.
   La advertencia CS9113 observada en master ya estaba corregida en beta antes de integrar S01.
 - Regresión API inicial S01: 62 comprobaciones correctas en una base demo nueva. La suite ampliada S01/S02
-  verifica ahora 308 comprobaciones; ver el informe S02.
+  verificó 308 comprobaciones; la ampliación S01/S02/S03 verifica ahora 580.
 - El rechazo de una liberación se compara con el pedido completo anterior: estado, repartidor, fechas y eventos
   permanecen iguales. Se comprueban también el acceso al historial, PIN oculto y límites entre usuarios/roles.
 - Recorrido existente tests/e2e-capturas.cjs: completó registro, pago simulado, pedido, preparación, salida,
@@ -80,7 +81,7 @@ ALLOW_DEMO_MUTATIONS=1 BASE=http://localhost:5390 node tests/seguridad-repartido
 ```
 
 El script crea cliente y pedidos propios y restaura ajustes al terminar; no limpia la base. No usar con datos
-reales. La versión ampliada debe finalizar con 308 comprobaciones correctas. Las instrucciones completas están en tests/README.md.
+reales. La versión ampliada debe finalizar con 580 comprobaciones correctas. Las instrucciones completas están en tests/README.md.
 
 ## Entrega y comprobaciones posteriores
 

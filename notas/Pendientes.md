@@ -25,7 +25,9 @@
 - [x] S02: asignación condicional atómica y evento en una transacción; el competidor recibe 409 y los reintentos
       del dueño no duplican eventos. Regresión S01/S02: 308 comprobaciones, incluidas 12 carreras entre dos sesiones.
       Detalle en `docs/SOLUCION-SEGURIDAD-S02.md`.
-- [ ] S03: comprobar el máximo de tres pedidos pendientes dentro de la operación atómica de creación.
+- [x] S03: cupo, número e inserción en la misma transacción SQLite. Ocho ráfagas de ocho solicitudes con
+      0/1/2/3 pendientes conservan el máximo de tres. Suite S01/S02/S03: 580 comprobaciones correctas.
+      Detalle en `docs/SOLUCION-SEGURIDAD-S03.md`.
 - [ ] S04: protección antiforgery en operaciones autenticadas con efectos; validar orígenes como defensa adicional.
 - [ ] S05: revocación de la sesión en servidor al cerrar sesión (no solo eliminación de la cookie).
 - [ ] S06: una transferencia pendiente por usuario, límites por cuenta/IP e idempotencia.
