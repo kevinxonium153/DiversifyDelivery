@@ -34,7 +34,7 @@ public static class AuthEndpoints
             AppException.ThrowIf(user!.Status == AccountStatus.Suspendido, "Tu cuenta está suspendida. Comunícate con el supermercado.");
             user.LastLoginAt = DateTime.Now;
             await db.SaveChangesAsync();
-            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, SecurityExtensions.BuildPrincipal(user));
+            await http.SignInUserAsync(user);
             return user.ToDto();
         }).RequireRateLimiting(HostingSecurity.LoginLimit);
 
@@ -53,12 +53,13 @@ public static class AuthEndpoints
             user.PasswordHash = hasher.HashPassword(user, req.Password!);
             db.Users.Add(user);
             await db.SaveChangesAsync();
-            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, SecurityExtensions.BuildPrincipal(user));
+            await http.SignInUserAsync(user);
             return Results.Created("/api/auth/me", user.ToDto());
         }).RequireRateLimiting(HostingSecurity.LoginLimit);
 
         auth.MapPost("/logout", async (HttpContext http) =>
         {
+            await http.RevokeSessionAsync();
             await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.NoContent();
         });
@@ -86,7 +87,7 @@ public static class AuthEndpoints
             }
             await db.SaveChangesAsync();
             cache.Remove(SecurityExtensions.SessionCacheKey(user.Id));
-            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, SecurityExtensions.BuildPrincipal(user));
+            await http.SignInUserAsync(user);
             return user.ToDto();
         }).RequireAuthorization();
     }

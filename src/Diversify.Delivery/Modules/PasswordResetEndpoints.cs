@@ -2,8 +2,6 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Diversify.Delivery.Core;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -95,7 +93,7 @@ public static class PasswordResetEndpoints
                 .ExecuteUpdateAsync(s => s.SetProperty(r => r.ExpiresAt, DateTime.Now), ct);
             await db.SaveChangesAsync(ct);
             cache.Remove(SecurityExtensions.SessionCacheKey(user.Id));
-            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, SecurityExtensions.BuildPrincipal(user));
+            await http.SignInUserAsync(user);
             return user.ToDto();
         }).RequireRateLimiting(HostingSecurity.LoginLimit);
     }

@@ -1,5 +1,13 @@
 namespace Diversify.Delivery.Core;
 
+/// <summary>Sesión revocable en servidor. Solo se guarda la huella del identificador de la cookie.</summary>
+public class UserSession
+{
+    public string Id { get; set; } = "";
+    public int UserId { get; set; }
+    public DateTime ExpiresAt { get; set; }
+}
+
 // Entidades de Diversify Delivery. Una sola base SQLite (delivery.db) para el supermercado.
 // Los precios están en lempiras (L) e incluyen ISV, igual que en Diversify POS.
 

@@ -1,5 +1,22 @@
 # Pruebas
 
+## Sesiones revocables (`seguridad-sesiones.cjs`)
+
+Regresión S05: copia de cookie tras logout, independencia entre equipos, rotación al editar perfil, cambio de
+contraseña, suspensión, vencimiento, renovación concurrente con logout y persistencia tras reinicios.
+Simula una base anterior quitando únicamente la tabla de sesiones de su base desechable y verifica que se crea
+de nuevo sin perder usuarios. La suite inicia y detiene sus propios procesos y usa un puerto libre.
+
+```bash
+dotnet build src/Diversify.Delivery -warnaserror
+node tests/seguridad-sesiones.cjs
+```
+
+Requiere Node 22+, `dotnet` y `python3` (solo para ajustar fechas y simular el esquema anterior en la base de
+prueba). Guarda datos de demostración en `test-results/sesiones-*`, ignorado por Git. No usa producción ni
+SMTP. El resultado esperado es `71 comprobaciones correctas`. El límite de login se eleva únicamente en su
+instancia desechable para poder probar varios equipos sin esperas; el valor de la aplicación no cambia.
+
 ## Seguridad del repartidor (`seguridad-repartidor.cjs`)
 
 Regresiones S01, S02 y S03: acceso por ID según asignación y estado, PIN oculto, liberación solo en

@@ -37,7 +37,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         // Lax (no Strict): el cliente llega a la tienda desde enlaces de WhatsApp o redes y debe seguir con sesión.
         o.Cookie.SameSite = SameSiteMode.Lax;
         o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
-        o.ExpireTimeSpan = TimeSpan.FromDays(30);
+        o.ExpireTimeSpan = SecurityExtensions.SessionLifetime;
         o.SlidingExpiration = true;
         o.Events.OnValidatePrincipal = SecurityExtensions.ValidateSessionAsync;
         o.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };

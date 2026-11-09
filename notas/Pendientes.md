@@ -29,7 +29,10 @@
       0/1/2/3 pendientes conservan el máximo de tres. Suite S01/S02/S03: 580 comprobaciones correctas.
       Detalle en `docs/SOLUCION-SEGURIDAD-S03.md`.
 - [ ] S04: protección antiforgery en operaciones autenticadas con efectos; validar orígenes como defensa adicional.
-- [ ] S05: revocación de la sesión en servidor al cerrar sesión (no solo eliminación de la cookie).
+- [x] S05: sesiones revocables persistidas en SQLite, verificación por petición sin caché de revocación,
+      rotación en inicios de sesión explícitos y caducidad. 71 comprobaciones, incluidos reinicios y actualización
+      de base existente. Ver `docs/SOLUCION-SEGURIDAD-S05.md`. Al desplegar, las cookies anteriores deben iniciar
+      sesión de nuevo y deben actualizarse todas las instancias del servidor.
 - [ ] S06: una transferencia pendiente por usuario, límites por cuenta/IP e idempotencia.
 - [ ] S07: rechazar métodos de pago no definidos y validar reglas de cada método.
 - [ ] S08: validar y normalizar imágenes, incluyendo las importadas de Diversify POS.

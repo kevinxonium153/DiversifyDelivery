@@ -24,6 +24,8 @@ jobs:
         run: for f in $(find src -name '*.js' -path '*wwwroot*') tests/*.cjs; do node --check "$f"; done
       - name: Revisar scripts de despliegue
         run: shellcheck -S warning deploy/*.sh deploy/proxmox/*.sh
+      - name: Revocación de sesiones (instancia y base demo aisladas)
+        run: node tests/seguridad-sesiones.cjs
       - name: Recorrido de punta a punta
         run: |
           npm install --no-save playwright@1.49.1

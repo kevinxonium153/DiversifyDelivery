@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,33 @@ public static class SecurityExtensions
 {
     public const string FullNameClaim = "full_name";
     public const string StampClaim = "stamp";
+    public const string SessionIdClaim = "session_id";
+    public static readonly TimeSpan SessionLifetime = TimeSpan.FromDays(30);
+
+    private static string SessionHash(string id) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id)));
+
+    /// <summary>Cada inicio de sesión explícito rota el identificador, también al cambiar el perfil o la contraseña.</summary>
+    public static async Task SignInUserAsync(this HttpContext http, User user)
+    {
+        var db = http.RequestServices.GetRequiredService<DeliveryDbContext>();
+        await http.RevokeSessionAsync();
+        var now = DateTime.UtcNow;
+        await db.UserSessions.Where(s => s.ExpiresAt <= now).ExecuteDeleteAsync();
+        var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        db.UserSessions.Add(new UserSession { Id = SessionHash(id), UserId = user.Id, ExpiresAt = now.Add(SessionLifetime) });
+        await db.SaveChangesAsync();
+        await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, BuildPrincipal(user, id));
+    }
+
+    /// <summary>No usa caché: borrar la fila invalida todas las copias de esta sesión, incluso tras reiniciar.</summary>
+    public static async Task RevokeSessionAsync(this HttpContext http)
+    {
+        var id = http.User.FindFirstValue(SessionIdClaim);
+        if (id is null) return;
+        var hash = SessionHash(id);
+        var db = http.RequestServices.GetRequiredService<DeliveryDbContext>();
+        await db.UserSessions.Where(s => s.Id == hash).ExecuteDeleteAsync();
+    }
 
     public static int UserId(this ClaimsPrincipal user) =>
         int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -45,7 +73,8 @@ public static class SecurityExtensions
     public static string SessionCacheKey(int userId) => $"session:{userId}";
 
     /// <summary>
-    /// Revisa en cada petición (caché de 30 s) que el usuario siga igual. Si el master lo suspende, le cambia la
+    /// Comprueba en cada petición la sesión en SQLite, sin caché. Revisa el usuario con caché de 30 s.
+    /// Si el master lo suspende, le cambia la
     /// contraseña o aprueba su pago (cambia el estado), la sesión se renueva o se cierra.
     /// </summary>
     public static async Task ValidateSessionAsync(CookieValidatePrincipalContext ctx)
@@ -58,23 +87,36 @@ public static class SecurityExtensions
             return;
         }
         var sp = ctx.HttpContext.RequestServices;
+        var sessionId = principal.FindFirstValue(SessionIdClaim);
+        // Las cookies anteriores a esta protección deben iniciar sesión de nuevo.
+        if (sessionId is null) { ctx.RejectPrincipal(); return; }
+        var db = sp.GetRequiredService<DeliveryDbContext>();
+        var hash = SessionHash(sessionId);
+        var now = DateTime.UtcNow;
+        var session = await db.UserSessions.AsNoTracking().FirstOrDefaultAsync(s => s.Id == hash && s.UserId == userId && s.ExpiresAt > now);
+        if (session is null) { ctx.RejectPrincipal(); return; }
         var cache = sp.GetRequiredService<IMemoryCache>();
         var current = await cache.GetOrCreateAsync(SessionCacheKey(userId), async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30);
-            var db = sp.GetRequiredService<DeliveryDbContext>();
             var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
             return user is null || user.Status == AccountStatus.Suspendido ? "" : Stamp(user);
         });
-        if (string.IsNullOrEmpty(current)) ctx.RejectPrincipal();
+        if (string.IsNullOrEmpty(current)) { ctx.RejectPrincipal(); return; }
         else if (current != stamp)
         {
             // Cambió algo que no cierra la sesión (ej. pago aprobado): se renueva la cookie con los datos nuevos.
-            var db = sp.GetRequiredService<DeliveryDbContext>();
             var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
             if (PasswordTag(user) != principal.FindFirstValue("pwd")) { ctx.RejectPrincipal(); return; }
-            ctx.ReplacePrincipal(BuildPrincipal(user));
+            ctx.ReplacePrincipal(BuildPrincipal(user, sessionId));
             ctx.ShouldRenew = true;
+        }
+        if (ctx.ShouldRenew || session.ExpiresAt <= now.Add(SessionLifetime / 2))
+        {
+            // Solo renueva filas vigentes: una petición en vuelo no puede recrear la sesión tras logout.
+            var renewed = await db.UserSessions.Where(s => s.Id == hash && s.ExpiresAt > now)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.ExpiresAt, now.Add(SessionLifetime)));
+            if (renewed == 0) ctx.RejectPrincipal();
         }
     }
 
@@ -82,7 +124,7 @@ public static class SecurityExtensions
     private static string PasswordTag(User u) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(u.PasswordHash)))[..12];
 
-    public static ClaimsPrincipal BuildPrincipal(User user)
+    public static ClaimsPrincipal BuildPrincipal(User user, string sessionId)
     {
         var claims = new List<Claim>
         {
@@ -93,6 +135,7 @@ public static class SecurityExtensions
             new("status", user.Status.ToString()),
             new(StampClaim, Stamp(user)),
             new("pwd", PasswordTag(user)),
+            new(SessionIdClaim, sessionId),
         };
         return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
     }

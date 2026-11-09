@@ -15,9 +15,16 @@ public class DeliveryDbContext(DbContextOptions<DeliveryDbContext> options) : Db
     public DbSet<RegistrationPayment> RegistrationPayments => Set<RegistrationPayment>();
     public DbSet<StoreSettings> Settings => Set<StoreSettings>();
     public DbSet<PasswordReset> PasswordResets => Set<PasswordReset>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.Entity<UserSession>(e =>
+        {
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.HasIndex(x => x.ExpiresAt);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
         model.Entity<User>(e =>
         {
             e.HasIndex(x => x.Login).IsUnique();
