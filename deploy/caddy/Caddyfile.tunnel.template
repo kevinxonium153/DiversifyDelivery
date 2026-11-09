@@ -1,0 +1,36 @@
+# Diversify Delivery detrás de Cloudflare Tunnel (sin IP pública).
+# Cloudflare pone el certificado HTTPS de delivery.diversify.hn y entrega las visitas por el túnel (cloudflared)
+# a este Caddy, que solo escucha en 127.0.0.1: nadie de afuera puede saltarse el túnel.
+{
+	auto_https off
+}
+
+:8080 {
+	bind 127.0.0.1
+	encode zstd gzip
+
+	# Fotos de productos (400 KB) son lo más grande que se sube.
+	request_body {
+		max_size 4MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:__PORT__ {
+		# IP real del cliente (Cloudflare la pone en Cf-Connecting-IP y no deja que el visitante la falsifique):
+		# la app la usa para el límite de intentos de login.
+		header_up X-Forwarded-For {http.request.header.Cf-Connecting-IP}
+		header_up X-Forwarded-Proto https
+	}
+
+	log {
+		output file /var/log/caddy/diversify-delivery.log {
+			roll_size 20MiB
+			roll_keep 10
+		}
+		format json
+	}
+}

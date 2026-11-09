@@ -1,0 +1,29 @@
+[Unit]
+Description=Cloudflare Tunnel de Diversify Delivery (delivery.diversify.hn sin IP pública)
+After=network-online.target caddy.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# TUNNEL_TOKEN vive en este archivo (solo root): así no aparece en la lista de procesos.
+EnvironmentFile=/etc/cloudflared/diversify-delivery.env
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run
+Restart=always
+RestartSec=5
+DynamicUser=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=true
+LockPersonality=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

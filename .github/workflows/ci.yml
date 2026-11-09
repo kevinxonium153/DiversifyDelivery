@@ -1,0 +1,33 @@
+# Revisión automática en cada push o PR a master y beta: compila, revisa el JavaScript y los scripts.
+name: CI
+
+on:
+  push:
+    branches: [master, beta]
+  pull_request:
+    branches: [master, beta]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compilar
+        run: dotnet build src/Diversify.Delivery -warnaserror
+      - name: Revisar JavaScript
+        run: for f in $(find src -name '*.js' -path '*wwwroot*') tests/*.cjs; do node --check "$f"; done
+      - name: Revisar scripts de despliegue
+        run: shellcheck -S warning deploy/*.sh deploy/proxmox/*.sh
+      - name: Recorrido de punta a punta
+        run: |
+          npm install --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+          dotnet run --project src/Diversify.Delivery --launch-profile http > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs http://localhost:5390/healthz && break; sleep 1; done
+          CAPTURAS=0 node tests/e2e-capturas.cjs

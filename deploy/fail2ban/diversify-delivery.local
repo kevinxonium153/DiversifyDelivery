@@ -1,0 +1,8 @@
+# SSH: 5 intentos fallidos en 10 minutos = bloqueo de 1 hora. (Los logins de Diversify Delivery ya tienen
+# límite de intentos dentro de la app.)
+[sshd]
+enabled = true
+backend = systemd
+maxretry = 5
+findtime = 10m
+bantime = 1h

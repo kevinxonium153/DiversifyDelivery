@@ -1,0 +1,45 @@
+[Unit]
+Description=Diversify Delivery (tienda en línea y pedidos a domicilio)
+Documentation=file:///opt/diversify-delivery/deploy/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=diversify-delivery
+Group=diversify-delivery
+WorkingDirectory=/opt/diversify-delivery/current
+ExecStart=/opt/diversify-delivery/current/Diversify.Delivery
+EnvironmentFile=/etc/diversify-delivery-delivery/delivery.env
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+SyslogIdentifier=diversify-delivery
+
+# --- Aislamiento: el servicio solo puede escribir en sus datos y no puede ganar privilegios ---
+NoNewPrivileges=true
+UMask=0077
+ProtectSystem=strict
+ReadWritePaths=/var/lib/diversify-delivery
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

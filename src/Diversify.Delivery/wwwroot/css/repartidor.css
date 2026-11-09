@@ -1,0 +1,33 @@
+/* App del repartidor: celular, una mano, botones grandes. */
+.d-top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; border-width: 0 0 1px; border-radius: 0; }
+.d-top .who { font-weight: 700; line-height: 1.1; }
+.d-top .who small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
+.duty { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface); font-weight: 700; font-size: 13px; cursor: pointer; }
+.duty i { width: 38px; height: 22px; border-radius: 11px; background: var(--border); position: relative; transition: background var(--dur); }
+.duty i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-1); transition: transform var(--dur) var(--ease-out); }
+.duty[aria-pressed="true"] i { background: var(--success); }
+.duty[aria-pressed="true"] i::after { transform: translateX(16px); }
+.d-main { padding: 14px 14px 100px; max-width: 640px; margin: 0 auto; display: grid; gap: 12px; }
+.d-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); border-width: 1px 0 0; border-radius: 0; }
+.d-tabs a { display: grid; justify-items: center; gap: 2px; padding: 6px; border-radius: 12px; color: var(--muted); text-decoration: none; font-size: 12px; font-weight: 700; position: relative; }
+.d-tabs a .ico { width: 24px; height: 24px; }
+.d-tabs a[aria-current="page"] { color: var(--text); background: var(--row-hover); }
+.d-tabs a .n { position: absolute; top: 2px; right: calc(50% - 22px); background: var(--accent); color: #18181b; min-width: 18px; height: 18px; border-radius: 9px; font-size: 11px; display: grid; place-items: center; padding: 0 4px; }
+.job { display: grid; gap: 10px; }
+.job .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.job .num { font-family: var(--mono); font-weight: 800; }
+.job .addr { display: grid; grid-template-columns: 24px 1fr; gap: 8px; font-size: 15px; }
+.job .addr .ico { color: var(--primary); margin-top: 2px; }
+.job .ref { color: var(--muted); font-size: 14px; }
+.job .money { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border-soft); }
+.job .money { gap: 10px; }
+.job .money > strong { font-size: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.job .note { padding: 10px 12px; border-radius: 12px; background: var(--warning-soft); border: 1px solid var(--warning-border); font-size: 14px; }
+.job .note b { color: var(--warning); }
+.job .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.job .btns .full { grid-column: 1 / -1; }
+.dist { font-size: 12px; font-weight: 700; color: var(--muted); }
+.pin-input { font-family: var(--mono); font-size: 34px; letter-spacing: .4em; text-align: center; width: 100%; padding: 12px; border-radius: 14px; border: 2px solid var(--border); background: var(--surface); }
+.pin-input:focus { outline: none; border-color: var(--accent); }
+.checklist label { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-soft); font-size: 14px; }
+.checklist input { width: 22px; height: 22px; accent-color: var(--success); }

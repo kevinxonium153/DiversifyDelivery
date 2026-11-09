@@ -1,0 +1,11 @@
+# Finales de línea: lo que corre en el servidor Linux (scripts, plantillas, servicios) siempre con LF, aunque se
+# clone en Windows. Con CRLF los scripts fallan ("\r: command not found").
+* text=auto
+*.sh text eol=lf
+deploy/** text eol=lf
+*.service text eol=lf
+*.timer text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.db binary

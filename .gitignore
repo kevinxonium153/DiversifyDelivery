@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+src/Diversify.Delivery/data/
+*.db
+*.db-shm
+*.db-wal
+dist/
+node_modules/
+test-results/

@@ -1,0 +1,9 @@
+[Unit]
+Description=Respaldo de la base de datos de Diversify Delivery
+After=diversify-delivery.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/diversify-delivery/deploy/backup.sh
+Nice=10
+IOSchedulingClass=idle

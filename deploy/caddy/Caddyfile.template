@@ -1,0 +1,38 @@
+# Diversify Delivery · Caddy termina HTTPS (Let's Encrypt automático) y pasa las peticiones a la app en 127.0.0.1.
+{
+	email __EMAIL__
+}
+
+__DOMAIN__ {
+	__TLS__
+	encode zstd gzip
+
+	# Fotos de productos (400 KB) son lo más grande que se sube.
+	request_body {
+		max_size 4MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# BEGIN-CONSOLA: el panel del master solo se abre desde estas redes (supermercado / VPN).
+	# La tienda (/) y la app de repartidores (/repartidor) siguen públicas.
+	@consola_fuera {
+		path /panel /panel/* /api/admin /api/admin/*
+		not remote_ip __ADMIN_NETS__
+	}
+	respond @consola_fuera 404
+	# END-CONSOLA
+
+	reverse_proxy 127.0.0.1:__PORT__
+
+	log {
+		output file /var/log/caddy/diversify-delivery.log {
+			roll_size 20MiB
+			roll_keep 10
+		}
+		format json
+	}
+}
