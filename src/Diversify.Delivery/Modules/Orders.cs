@@ -404,15 +404,29 @@ public static class Orders
 
         g.MapPost("/orders/{id:int}/take", async (int id, ClaimsPrincipal me, DeliveryDbContext db) =>
         {
+            var driverId = me.UserId();
+            var now = DateTime.Now;
+            // La condición y la asignación se ejecutan en una sola escritura. Solo un repartidor puede ganar.
+            // El evento se confirma en la misma transacción para no registrar asignaciones que no se guardaron.
+            await using var tx = await db.Database.BeginTransactionAsync();
+            var taken = await db.Orders.Where(o => o.Id == id && o.DriverId == null &&
+                    (o.Status == OrderStatus.Preparando || o.Status == OrderStatus.Listo))
+                .ExecuteUpdateAsync(s => s.SetProperty(o => o.DriverId, (int?)driverId)
+                    .SetProperty(o => o.UpdatedAt, now));
             var o = await db.Orders.WithDetails().FirstOrDefaultAsync(x => x.Id == id) ?? throw AppException.NotFound("Pedido");
-            AppException.ThrowIf(o.DriverId is not null && o.DriverId != me.UserId(), "Otro repartidor ya tomó este pedido.");
-            AppException.ThrowIf(o.Status is not (OrderStatus.Preparando or OrderStatus.Listo), "Este pedido ya no está disponible.");
-            var driver = await db.Users.FindAsync(me.UserId());
-            o.DriverId = driver!.Id;
-            o.Driver = driver;
-            o.UpdatedAt = DateTime.Now;
-            o.Events.Add(new OrderEvent { Status = o.Status, By = driver.FullName, Message = $"{driver.FullName} tomó el pedido." });
-            await db.SaveChangesAsync();
+            if (taken == 0)
+            {
+                // Un reintento del dueño sigue siendo válido, sin duplicar eventos ni cambiar la fecha.
+                if (o.DriverId != driverId || o.Status is not (OrderStatus.Preparando or OrderStatus.Listo))
+                    throw new AppException("El pedido ya no está disponible o fue tomado por otro repartidor. Actualiza la lista.",
+                        StatusCodes.Status409Conflict);
+            }
+            else
+            {
+                o.Events.Add(new OrderEvent { Status = o.Status, By = o.Driver!.FullName, Message = $"{o.Driver.FullName} tomó el pedido." });
+                await db.SaveChangesAsync();
+            }
+            await tx.CommitAsync();
             return ToDto(o, includePin: false);
         });
 

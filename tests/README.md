@@ -2,8 +2,10 @@
 
 ## Seguridad del repartidor (`seguridad-repartidor.cjs`)
 
-Regresión del hallazgo S01: acceso por ID según asignación y estado, PIN oculto, liberación solo en
-Preparando/Listo y conservación de asignación, fechas e historial ante rechazos. Requiere Node 22 o posterior
+Regresiones S01 y S02: acceso por ID según asignación y estado, PIN oculto, liberación solo en
+Preparando/Listo y conservación de asignación, fechas e historial ante rechazos. Incluye 12 carreras entre dos
+sesiones, alternando Preparando/Listo: exactamente un HTTP 200 y un 409, una sola asignación/evento y reintentos
+idempotentes del ganador. Requiere Node 22 o posterior
 y una app local en desarrollo con datos demo. Crea su propio cliente y pedidos; restaura los ajustes al acabar.
 Usar **solo una base desechable**: no borra ni limpia datos existentes.
 
@@ -14,7 +16,7 @@ Storage__DataRoot="$(mktemp -d)" dotnet run --project src/Diversify.Delivery --l
 ALLOW_DEMO_MUTATIONS=1 BASE=http://localhost:5390 node tests/seguridad-repartidor.cjs
 ```
 
-No ejecutar en producción. El resultado esperado es `62 comprobaciones correctas`.
+No ejecutar en producción. El resultado esperado es `308 comprobaciones correctas`.
 
 ## Recorrido de punta a punta (`e2e-capturas.cjs`)
 

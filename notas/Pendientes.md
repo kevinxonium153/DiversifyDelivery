@@ -22,7 +22,9 @@
 - [x] S01: restringir consulta por ID a pedidos propios o disponibles (Preparando/Listo sin repartidor);
       impedir liberar pedidos Recibido, EnCamino, Entregado y Cancelado, conservando la atribución histórica.
       Validado con 62 comprobaciones de regresión. Solución en `docs/SOLUCION-SEGURIDAD-S01.md`.
-- [ ] S02: asignación atómica para evitar que dos repartidores tomen el mismo pedido simultáneamente.
+- [x] S02: asignación condicional atómica y evento en una transacción; el competidor recibe 409 y los reintentos
+      del dueño no duplican eventos. Regresión S01/S02: 308 comprobaciones, incluidas 12 carreras entre dos sesiones.
+      Detalle en `docs/SOLUCION-SEGURIDAD-S02.md`.
 - [ ] S03: comprobar el máximo de tres pedidos pendientes dentro de la operación atómica de creación.
 - [ ] S04: protección antiforgery en operaciones autenticadas con efectos; validar orígenes como defensa adicional.
 - [ ] S05: revocación de la sesión en servidor al cerrar sesión (no solo eliminación de la cookie).

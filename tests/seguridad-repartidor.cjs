@@ -1,4 +1,4 @@
-// Regresión S01. Solo en una instancia local desechable con usuarios y pagos demo.
+// Regresiones S01 y S02. Solo en una instancia local desechable con usuarios y pagos demo.
 // ALLOW_DEMO_MUTATIONS=1 BASE=http://127.0.0.1:5493 node tests/seguridad-repartidor.cjs
 const assert = require('node:assert/strict');
 const BASE = process.env.BASE || 'http://localhost:5390';
@@ -13,10 +13,13 @@ function client() {
       body: data === undefined ? undefined : JSON.stringify(data),
     });
     const text = await r.text();
-    assert.equal(r.status, expected, `${method} ${path}: ${text}`); checks++;
+    if (Array.isArray(expected)) assert(expected.includes(r.status), `${method} ${path}: ${r.status} ${text}`);
+    else assert.equal(r.status, expected, `${method} ${path}: ${text}`);
+    checks++;
     const set = r.headers.getSetCookie().find((s) => s.startsWith('diversify.delivery='));
     if (set) cookie = set.split(';')[0];
-    return text ? JSON.parse(text) : null;
+    const body = text ? JSON.parse(text) : null;
+    return Array.isArray(expected) ? { status: r.status, body } : body;
   };
 }
 (async () => {
@@ -81,6 +84,35 @@ function client() {
     await read(unassigned.id, driver, 404); // Cancelado sin asignar tampoco es disponible.
     const available = await driver('GET', '/driver/orders?scope=available');
     assert(!available.some((x) => [id, cancelled.id, unassigned.id].includes(x.id)), 'No listar cerrados como disponibles.'); checks++;
+    // Dos cookies distintas compiten por el mismo pedido. Comprobar respuestas Y estado persistido.
+    const contested = await create();
+    await master('POST', `/admin/orders/${contested.id}/status`, { status: 'Preparando' });
+    for (let round = 0; round < 12; round++) {
+      if (round > 0) await master('POST', `/admin/orders/${contested.id}/status`, { status: round % 2 ? 'Listo' : 'Preparando' });
+      const before = await inspect(contested.id);
+      const actors = round % 2 ? [other, driver] : [driver, other];
+      const outcomes = await Promise.all(actors.map((actor) => actor('POST', `/driver/orders/${contested.id}/take`, undefined, [200, 409])));
+      assert.deepEqual(outcomes.map((r) => r.status).sort(), [200, 409], 'Exactamente un repartidor gana; el otro recibe conflicto.'); checks++;
+      const winnerIndex = outcomes.findIndex((r) => r.status === 200);
+      const winner = actors[winnerIndex], loser = actors[1 - winnerIndex];
+      const saved = await inspect(contested.id);
+      assert.equal(saved.driverId, outcomes[winnerIndex].body.driverId, 'La asignación persistida debe coincidir con la confirmación.'); checks++;
+      assert.equal(saved.events.length, before.events.length + 1, 'Solo la asignación ganadora añade un evento.'); checks++;
+      assert.equal(saved.status, before.status); checks++;
+      assert.equal(outcomes[winnerIndex].body.deliveryPin, null); checks++;
+      assert.deepEqual(Object.keys(outcomes[1 - winnerIndex].body), ['error'], 'El conflicto no debe devolver datos del pedido.'); checks++;
+      await read(contested.id, loser, 404);
+      await loser('POST', `/driver/orders/${contested.id}/release`, undefined, 404);
+      // Reenviar la misma solicitud del ganador no vuelve a asignar ni duplica eventos.
+      await Promise.all([winner('POST', `/driver/orders/${contested.id}/take`), winner('POST', `/driver/orders/${contested.id}/take`)]);
+      assert.deepEqual(await inspect(contested.id), saved, 'Los reintentos del dueño son idempotentes.'); checks++;
+      await winner('POST', `/driver/orders/${contested.id}/release`);
+      assert.equal((await inspect(contested.id)).driverId, null); checks++;
+    }
+    await master('POST', `/admin/orders/${contested.id}/cancel`, { reason: 'Fin de regresión de concurrencia' });
+    const closed = await inspect(contested.id);
+    await driver('POST', `/driver/orders/${contested.id}/take`, undefined, 409);
+    assert.deepEqual(await inspect(contested.id), closed); checks++;
   } finally {
     await master('PUT', '/admin/settings', settings);
   }
