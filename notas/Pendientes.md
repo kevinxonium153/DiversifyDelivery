@@ -17,6 +17,27 @@
 9. **Notificaciones:** ¿WhatsApp automático (requiere WhatsApp Business API, con costo), SMS o correo?
 10. **Logo propio** de "Diversify Delivery" o se queda la marca Diversify con la palabra DELIVERY.
 
+## Seguridad y operación (revisión del 9 de noviembre de 2026)
+
+- [x] S01: restringir consulta por ID a pedidos propios o disponibles (Preparando/Listo sin repartidor);
+      impedir liberar pedidos Recibido, EnCamino, Entregado y Cancelado, conservando la atribución histórica.
+      Validado con 62 comprobaciones de regresión. Solución en `docs/SOLUCION-SEGURIDAD-S01.md`.
+- [ ] S02: asignación atómica para evitar que dos repartidores tomen el mismo pedido simultáneamente.
+- [ ] S03: comprobar el máximo de tres pedidos pendientes dentro de la operación atómica de creación.
+- [ ] S04: protección antiforgery en operaciones autenticadas con efectos; validar orígenes como defensa adicional.
+- [ ] S05: revocación de la sesión en servidor al cerrar sesión (no solo eliminación de la cookie).
+- [ ] S06: una transferencia pendiente por usuario, límites por cuenta/IP e idempotencia.
+- [ ] S07: rechazar métodos de pago no definidos y validar reglas de cada método.
+- [ ] S08: validar y normalizar imágenes, incluyendo las importadas de Diversify POS.
+- [ ] Corregir las rutas a `delivery.env` en systemd y actualización; probar instalación nueva.
+- [ ] Validar IP real detrás de Caddy/Cloudflare y evitar acceso directo a Kestrel; añadir límites por cuenta.
+- [ ] Generar PIN con criptografía y limitar intentos por pedido/cuenta.
+- [x] Advertencia CS9113 (`httpFactory` sin usar) ya corregida en beta antes de integrar S01;
+      compilación con `-warnaserror` verificada sin advertencias.
+- [ ] Desplegar S01 y repetir la validación en el entorno publicado; revisar atribuciones de pedidos históricos
+      que pudieran haber sido alteradas antes de la corrección, sin reconstruirlas automáticamente.
+- [ ] Retomar guardado de la configuración reutilizable del entorno: la plataforma no confirmó el borrador.
+
 ## Técnico
 
 - [x] Cobro de la inscripción con PixelPay: Hosted Payment, orden firmada (SHA3-512), regreso y aviso

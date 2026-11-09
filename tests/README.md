@@ -1,5 +1,21 @@
 # Pruebas
 
+## Seguridad del repartidor (`seguridad-repartidor.cjs`)
+
+Regresión del hallazgo S01: acceso por ID según asignación y estado, PIN oculto, liberación solo en
+Preparando/Listo y conservación de asignación, fechas e historial ante rechazos. Requiere Node 22 o posterior
+y una app local en desarrollo con datos demo. Crea su propio cliente y pedidos; restaura los ajustes al acabar.
+Usar **solo una base desechable**: no borra ni limpia datos existentes.
+
+```bash
+# En una terminal, desde la raíz del repositorio:
+Storage__DataRoot="$(mktemp -d)" dotnet run --project src/Diversify.Delivery --launch-profile http
+# En otra terminal:
+ALLOW_DEMO_MUTATIONS=1 BASE=http://localhost:5390 node tests/seguridad-repartidor.cjs
+```
+
+No ejecutar en producción. El resultado esperado es `62 comprobaciones correctas`.
+
 ## Recorrido de punta a punta (`e2e-capturas.cjs`)
 
 Usa Playwright con Chromium. Simula tres personas a la vez:

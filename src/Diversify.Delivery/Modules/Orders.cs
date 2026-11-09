@@ -394,7 +394,10 @@ public static class Orders
 
         g.MapGet("/orders/{id:int}", async (int id, ClaimsPrincipal me, DeliveryDbContext db) =>
         {
-            var o = await db.Orders.AsNoTracking().WithDetails().FirstOrDefaultAsync(x => x.Id == id && (x.DriverId == me.UserId() || x.DriverId == null))
+            // La consulta por ID respeta la misma disponibilidad que el listado: un ID conocido no da acceso.
+            var o = await db.Orders.AsNoTracking().WithDetails().FirstOrDefaultAsync(x => x.Id == id &&
+                    (x.DriverId == me.UserId() || (x.DriverId == null &&
+                        (x.Status == OrderStatus.Preparando || x.Status == OrderStatus.Listo))))
                     ?? throw AppException.NotFound("Pedido");
             return ToDto(o, includePin: false);
         });
@@ -415,13 +418,18 @@ public static class Orders
 
         g.MapPost("/orders/{id:int}/release", async (int id, ClaimsPrincipal me, DeliveryDbContext db) =>
         {
+            // Mantener lectura, validación y escritura juntas: no soltar un pedido que se cerró en paralelo.
+            await using var tx = await db.Database.BeginTransactionAsync();
             var o = await db.Orders.WithDetails().FirstOrDefaultAsync(x => x.Id == id && x.DriverId == me.UserId()) ?? throw AppException.NotFound("Pedido");
             AppException.ThrowIf(o.Status == OrderStatus.EnCamino, "El pedido ya va en camino: avisa al supermercado.");
+            AppException.ThrowIf(o.Status is not (OrderStatus.Preparando or OrderStatus.Listo),
+                "Solo puedes soltar pedidos que se estén preparando o estén listos. Los pedidos cerrados conservan su repartidor.");
             o.DriverId = null;
             o.Driver = null;
             o.UpdatedAt = DateTime.Now;
             o.Events.Add(new OrderEvent { Status = o.Status, By = me.DisplayName(), Message = $"{me.DisplayName()} soltó el pedido." });
             await db.SaveChangesAsync();
+            await tx.CommitAsync();
             return ToDto(o, includePin: false);
         });
 
