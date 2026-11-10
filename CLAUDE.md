@@ -2,7 +2,7 @@
 
 Léelo antes de cambiar algo. Uso y comandos: `README.md`. Funciones y capturas: `docs/FUNCIONALIDADES.md`.
 Integración: `docs/INTEGRACION-DIVERSIFY.md`. Servidor: `docs/DESPLIEGUE-PROXMOX.md`. Preguntas abiertas:
-`notas/Pendientes.md`.
+`notas/Pendientes.md`. Bugs conocidos: `notas/Bugs.md` (revisarlo antes de tocar un área).
 
 ## Qué es
 

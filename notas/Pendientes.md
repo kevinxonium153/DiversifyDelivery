@@ -1,5 +1,8 @@
 # Pendientes y preguntas
 
+> **Bugs encontrados en la revisión del 2026-11-10:** [Bugs.md](Bugs.md): 25 abiertos (2 críticos de despliegue,
+> 3 altos) y 2 ya corregidos por S01/S02. Seguridad: [docs/BUGS-SEGURIDAD.md](../docs/BUGS-SEGURIDAD.md).
+
 ## Preguntas para definir (dueño del proyecto)
 
 1. ~~Pasarela de pago~~ → **PixelPay** (definido 2026-11-09). Falta: credenciales del comercio (Key ID, llave
