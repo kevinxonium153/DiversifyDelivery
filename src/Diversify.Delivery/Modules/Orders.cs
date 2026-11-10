@@ -163,10 +163,13 @@ public static class Orders
         g.MapPost("/", async (OrderInput input, ClaimsPrincipal me, DeliveryDbContext db) =>
         {
             var user = await db.Users.FindAsync(me.UserId()) ?? throw AppException.NotFound("Usuario");
+            if (Subscriptions.ExpireIfDue(user, DateTime.Now)) await db.SaveChangesAsync();
             AppException.ThrowIf(user.Status != AccountStatus.Activo,
                 user.Status == AccountStatus.EnRevision
-                    ? "Estamos verificando el pago de tu inscripción. Podrás pedir en cuanto se apruebe."
-                    : "Para hacer pedidos primero paga la inscripción de tu cuenta.");
+                    ? "Estamos verificando el pago de tu suscripción. Podrás pedir en cuanto se apruebe."
+                    : user.SubscriptionEndsAt is DateTime ended
+                        ? $"Tu suscripción mensual venció el {ended:dd/MM/yyyy}. Renuévala para seguir pidiendo."
+                        : "Para hacer pedidos primero paga la suscripción mensual de tu cuenta.");
             var s = await db.Settings.OrderBy(x => x.Id).FirstAsync();
             AppException.ThrowIf(!s.AcceptingOrders, "La tienda no está recibiendo pedidos en este momento.");
             AppException.ThrowIf(!IsOpen(s), $"La tienda recibe pedidos de {s.OpensAt} a {s.ClosesAt}.");
@@ -281,6 +284,7 @@ public static class Orders
                 $"No se puede pasar de {o.Status} a {input.Status}.");
             AppException.ThrowIf(input.Status == OrderStatus.EnCamino && o.DriverId is null, "Asigna un repartidor antes de despacharlo.");
             AddEvent(o, input.Status, input.Message, me.DisplayName());
+            if (input.Status == OrderStatus.Entregado) await Loyalty.CreditDeliveredAsync(db, o);
             await db.SaveChangesAsync();
             return ToDto(o, includePin: true);
         });
@@ -463,6 +467,7 @@ public static class Orders
             AppException.ThrowIf(o.Status != OrderStatus.EnCamino, "Marca primero que vas en camino.");
             AppException.ThrowIf((input.Pin ?? "").Trim() != o.DeliveryPin, "El código de entrega no coincide. Pídeselo al cliente (lo ve en su pedido).");
             AddEvent(o, OrderStatus.Entregado, null, me.DisplayName());
+            await Loyalty.CreditDeliveredAsync(db, o);
             await db.SaveChangesAsync();
             return ToDto(o, includePin: false);
         }).RequireRateLimiting(HostingSecurity.LoginLimit);

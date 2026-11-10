@@ -38,6 +38,24 @@ public static class DbInitializer
 
         if (config.GetValue("Seed:DemoData", false) && !await db.Products.AnyAsync())
             await SeedDemoAsync(db, hasher);
+
+        await UpgradeCustomersAsync(db);
+    }
+
+    /// <summary>
+    /// Bases anteriores a la suscripción mensual y los puntos: cada cliente recibe su código de invitación, y los que
+    /// ya estaban activos (pagaron la inscripción única) reciben un mes de suscripción desde hoy.
+    /// </summary>
+    private static async Task UpgradeCustomersAsync(DeliveryDbContext db)
+    {
+        var customers = await db.Users.Where(u => u.Role == Roles.Customer &&
+            (u.ReferralCode == null || (u.Status == AccountStatus.Activo && u.SubscriptionEndsAt == null))).ToListAsync();
+        foreach (var u in customers)
+        {
+            u.ReferralCode ??= await Modules.Loyalty.NewCodeAsync(db);
+            if (u.Status == AccountStatus.Activo && u.SubscriptionEndsAt is null) u.SubscriptionEndsAt = DateTime.Now.AddMonths(1);
+            await db.SaveChangesAsync(); // uno por uno: el código nuevo debe verse al generar el siguiente
+        }
     }
 
     private static readonly Dictionary<string, string> Emojis = new()
@@ -103,8 +121,15 @@ public static class DbInitializer
         var customer = NewUser("cliente@demo.hn", "María López", Roles.Customer, "cliente123", "9555-1234");
         var pending = NewUser("ana@demo.hn", "Ana Martínez", Roles.Customer, "cliente123", "3344-5566", status: AccountStatus.EnRevision);
         var customer2 = NewUser("luis@demo.hn", "Luis Fernández", Roles.Customer, "cliente123", "8899-0011");
+        // Suscripción pagada (mes en curso) y códigos de invitación fijos para las pruebas. A Luis lo invitó María.
+        customer.SubscriptionEndsAt = DateTime.Now.AddDays(-12).AddMonths(1);
+        customer2.SubscriptionEndsAt = DateTime.Now.AddDays(-3).AddMonths(1);
+        customer.ReferralCode = "MARIA5";
+        pending.ReferralCode = "ANAM26";
+        customer2.ReferralCode = "LUISF8";
         db.Users.AddRange(driver1, driver2, customer, pending, customer2);
         await db.SaveChangesAsync();
+        customer2.ReferredById = customer.Id;
 
         db.RegistrationPayments.AddRange(
             new RegistrationPayment { UserId = customer.Id, Method = "Tarjeta", AmountUsd = 5, AmountHnl = 132.50m, GatewayId = "SIM-000101",
@@ -241,6 +266,11 @@ public static class DbInitializer
                 ("FRU-AGU-01", 3), ("CAR-RES-01", 2), ("LAC-YOG-01", 1), ("SNK-PAP-01", 2)),
             NewOrder(customer2, home2, OrderStatus.Recibido, 3, PaymentMethod.Efectivo, null, null,
                 ("BEB-CER-01", 2), ("SNK-PAP-01", 3), ("BEB-GAS-01", 1), ("FRU-LIM-01", 1)));
+        await db.SaveChangesAsync();
+
+        // Puntos de los pedidos ya entregados (María gana por su compra y por la de Luis, su invitado).
+        foreach (var o in await db.Orders.Where(o => o.Status == OrderStatus.Entregado).ToListAsync())
+            await Modules.Loyalty.CreditDeliveredAsync(db, o);
         await db.SaveChangesAsync();
     }
 }

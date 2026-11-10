@@ -53,6 +53,13 @@
 
 ## Técnico
 
+- [x] Suscripción mensual de US$5 (antes inscripción única), puntos 2 % por compra y 2 % por invitado, "Mis puntos"
+      y código de invitación. Decisión 006, prueba `tests/puntos-suscripcion.cjs`.
+- [ ] **Definir el canje de puntos** (descuento en el pedido, tope, si cubre el envío, cuadre del efectivo).
+- [ ] Cobro automático de la suscripción: PixelPay "Cobros recurrentes" (beta) o tokenización de BAC.
+- [ ] Avisar por correo unos días antes de que venza la suscripción.
+- [ ] Pasarela de BAC Credomatic: falta afiliación de comercio electrónico y documentación técnica del banco.
+
 - [x] Cobro de la inscripción con PixelPay: Hosted Payment, orden firmada (SHA3-512), regreso y aviso
       (`_callback`) verificados, prueba automática. Revisado con la documentación oficial (MCP de PixelPay).
 - [ ] Probar PixelPay con el sandbox real desde una computadora (desde la nube lo bloquea Cloudflare) y luego en

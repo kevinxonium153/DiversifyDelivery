@@ -55,8 +55,10 @@ function heroHtml() {
   else if (!s.openNow) notice = `<div class="alert warn" style="margin-bottom:14px">${icon('clock')}<div><strong>Fuera de horario.</strong> Recibimos pedidos de ${esc(s.opensAt)} a ${esc(s.closesAt)}.</div></div>`;
   if (u && u.role === 'cliente' && u.status !== 'Activo') {
     notice += u.status === 'EnRevision'
-      ? `<div class="alert info" style="margin-bottom:14px">${icon('clock')}<div><strong>Estamos verificando tu pago de inscripción.</strong> Te avisaremos en cuanto se apruebe.</div></div>`
-      : `<div class="alert warn" style="margin-bottom:14px">${icon('card')}<div><strong>Activa tu cuenta</strong> pagando la inscripción única de ${money(s.registrationFeeHnl)} (US$${s.registrationFeeUsd}). <a href="#/inscripcion">Pagar ahora</a></div></div>`;
+      ? `<div class="alert info" style="margin-bottom:14px">${icon('clock')}<div><strong>Estamos verificando el pago de tu suscripción.</strong> Te avisaremos en cuanto se apruebe.</div></div>`
+      : u.subscriptionEndsAt
+        ? `<div class="alert warn" style="margin-bottom:14px">${icon('card')}<div><strong>Tu suscripción venció.</strong> Renuévala por US$${s.registrationFeeUsd} al mes para seguir pidiendo. <a href="#/inscripcion">Renovar ahora</a></div></div>`
+        : `<div class="alert warn" style="margin-bottom:14px">${icon('card')}<div><strong>Activa tu cuenta</strong> con la suscripción mensual de ${money(s.registrationFeeHnl)} (US$${s.registrationFeeUsd}). <a href="#/inscripcion">Pagar ahora</a></div></div>`;
   }
   return `${notice}<section class="hero">
     <h1>Tu súper <em>a domicilio</em>, sin hacer fila.</h1>
@@ -69,7 +71,7 @@ function heroHtml() {
     </div>
     <div class="art" aria-hidden="true">🛒</div>
   </section>
-  ${!u ? `<div class="card flat row between" style="margin-bottom:18px"><div><strong>¿Primera vez?</strong> <span class="muted">Crea tu cuenta con una inscripción única de US$${s.registrationFeeUsd} y pide cuando quieras.</span></div><a class="btn ink" href="#/registro">Crear cuenta</a></div>` : ''}`;
+  ${!u ? `<div class="card flat row between" style="margin-bottom:18px"><div><strong>¿Primera vez?</strong> <span class="muted">Suscripción de US$${s.registrationFeeUsd} al mes: pide cuando quieras y gana ${s.pointsPercent} % en puntos con cada compra.</span></div><a class="btn ink" href="#/registro">Crear cuenta</a></div>` : ''}`;
 }
 
 export async function renderCatalog(view, ctx, filter = {}) {

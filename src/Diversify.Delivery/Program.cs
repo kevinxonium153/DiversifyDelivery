@@ -29,6 +29,7 @@ builder.Services.AddSingleton<PixelPayService>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddSingleton<DiversifySyncService>();
 builder.Services.AddHostedService<DiversifySyncWorker>();
+builder.Services.AddHostedService<SubscriptionExpiryWorker>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o =>
@@ -84,6 +85,7 @@ PasswordResetEndpoints.Map(api);
 RegistrationEndpoints.Map(api);
 CatalogEndpoints.Map(api);
 Orders.Map(api);
+Loyalty.Map(api);
 AdminEndpoints.Map(api);
 DiversifySyncEndpoints.Map(api);
 

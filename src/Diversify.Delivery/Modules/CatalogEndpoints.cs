@@ -75,6 +75,7 @@ public static class CatalogEndpoints
             {
                 s.StoreName, s.StorePhone, s.StoreAddress, s.DeliveryFee, s.MinimumOrder, s.FreeDeliveryFrom,
                 s.RegistrationFeeUsd, registrationFeeHnl = Money.Round(s.RegistrationFeeUsd * s.ExchangeRate), s.ExchangeRate,
+                s.PointsPercent, s.ReferralPercent,
                 s.OpensAt, s.ClosesAt, s.AcceptingOrders, openNow = Orders.IsOpen(s),
             };
         });

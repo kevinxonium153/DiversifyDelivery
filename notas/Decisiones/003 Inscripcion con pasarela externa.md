@@ -1,6 +1,6 @@
 # 003 · Inscripción de US$5 (pago único) con PixelPay o transferencia
 
-**Fecha:** 2026-11-09 · **Estado:** aceptada · **Actualizada:** PixelPay elegido; la inscripción es pago único. La forma de integrar
+**Fecha:** 2026-11-09 · **Estado:** reemplazada en parte por la [Decisión 006](006%20Suscripcion%20mensual%20y%20puntos.md) (suscripción mensual) · **Actualizada:** PixelPay elegido; la inscripción es pago único. La forma de integrar
 PixelPay la reemplaza la [Decisión 005](005%20PixelPay%20Hosted%20Payment.md) (Hosted Payment).
 
 ## Decisión

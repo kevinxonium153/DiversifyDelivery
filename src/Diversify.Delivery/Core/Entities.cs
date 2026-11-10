@@ -31,6 +31,32 @@ public class User
     public bool OnDuty { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime? LastLoginAt { get; set; }
+    /// <summary>Clientes: la suscripción mensual está pagada hasta esta fecha. Null = nunca ha pagado.</summary>
+    public DateTime? SubscriptionEndsAt { get; set; }
+    /// <summary>Clientes: código para invitar a otros (va en el enlace de registro).</summary>
+    public string? ReferralCode { get; set; }
+    /// <summary>Clientes: quién lo invitó. Esa persona gana puntos con sus compras.</summary>
+    public int? ReferredById { get; set; }
+}
+
+public enum PointsKind { Compra, Referido, Ajuste }
+
+/// <summary>
+/// Movimiento de puntos (1 punto = L 1). El saldo es la suma de los movimientos: nunca se edita un saldo a mano.
+/// Compra: el cliente gana un % de su pedido entregado. Referido: quien lo invitó gana un % del mismo pedido.
+/// </summary>
+public class PointsEntry
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public PointsKind Kind { get; set; }
+    public decimal Points { get; set; }
+    /// <summary>Pedido que generó los puntos (Compra y Referido).</summary>
+    public int? OrderId { get; set; }
+    /// <summary>Referido: el cliente invitado que hizo la compra.</summary>
+    public int? FromUserId { get; set; }
+    public string Description { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 }
 
 public class Category
@@ -243,7 +269,12 @@ public class StoreSettings
     public decimal MinimumOrder { get; set; } = 200;
     /// <summary>Envío gratis desde este subtotal. 0 = nunca.</summary>
     public decimal FreeDeliveryFrom { get; set; } = 1500;
+    /// <summary>Suscripción mensual del cliente en dólares (se cobra en lempiras al tipo de cambio).</summary>
     public decimal RegistrationFeeUsd { get; set; } = 5;
+    /// <summary>% del total de cada pedido entregado que gana el cliente en puntos (1 punto = L 1).</summary>
+    public decimal PointsPercent { get; set; } = 2;
+    /// <summary>% del total de cada pedido entregado de un invitado que gana quien lo invitó.</summary>
+    public decimal ReferralPercent { get; set; } = 2;
     /// <summary>Lempiras por dólar (para mostrar y cobrar la inscripción en lempiras).</summary>
     public decimal ExchangeRate { get; set; } = 26.50m;
     /// <summary>Datos para pagar por transferencia (banco, cuenta, titular). Texto libre.</summary>

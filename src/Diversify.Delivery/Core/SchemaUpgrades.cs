@@ -15,12 +15,19 @@ public static class SchemaUpgrades
     private static readonly (string Table, string Column, string SqlType)[] Columns =
     [
         ("RegistrationPayments", "OrderId", "TEXT NULL"),
+        ("Users", "SubscriptionEndsAt", "TEXT NULL"),
+        ("Users", "ReferralCode", "TEXT NULL"),
+        ("Users", "ReferredById", "INTEGER NULL"),
+        ("Settings", "PointsPercent", "REAL NOT NULL DEFAULT 2"),
+        ("Settings", "ReferralPercent", "REAL NOT NULL DEFAULT 2"),
     ];
 
     /// <summary>Índices nuevos (IF NOT EXISTS: no hace nada si ya están).</summary>
     private static readonly string[] Indexes =
     [
         "CREATE INDEX IF NOT EXISTS \"IX_RegistrationPayments_GatewayId\" ON \"RegistrationPayments\" (\"GatewayId\")",
+        "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Users_ReferralCode\" ON \"Users\" (\"ReferralCode\")",
+        "CREATE INDEX IF NOT EXISTS \"IX_Users_ReferredById\" ON \"Users\" (\"ReferredById\")",
     ];
 
     public static async Task ApplyAsync(DeliveryDbContext db)

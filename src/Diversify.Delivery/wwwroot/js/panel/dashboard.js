@@ -16,7 +16,7 @@ export default {
           <div class="kpi glass"><div class="label">${icon('clock')} Tiempo de entrega</div><div class="value">${d.avgDeliveryMinutes} min</div><div class="hint">Promedio 7 días (pedido → entregado)</div></div>
           <div class="kpi glass"><div class="label">${icon('bike')} Repartidores en turno</div><div class="value">${d.driversOnDuty}</div><div class="hint">${d.activeCustomers} clientes activos</div></div>
         </div>
-        ${d.pendingRegistrations ? `<a class="alert warn" href="#/clientes" style="margin-top:14px;text-decoration:none">${icon('card')}<div><strong>${d.pendingRegistrations} ${d.pendingRegistrations === 1 ? 'pago de inscripción' : 'pagos de inscripción'} por revisar.</strong> Revisa la transferencia y activa la cuenta.</div></a>` : ''}
+        ${d.pendingRegistrations ? `<a class="alert warn" href="#/clientes" style="margin-top:14px;text-decoration:none">${icon('card')}<div><strong>${d.pendingRegistrations} ${d.pendingRegistrations === 1 ? 'pago de suscripción' : 'pagos de suscripción'} por revisar.</strong> Revisa la transferencia y aprueba el mes.</div></a>` : ''}
         <div class="grid-2" style="margin-top:16px">
           <section class="card">
             <div class="card-title"><h2>Pedidos por estado</h2><a class="btn sm" href="#/pedidos">Abrir tablero</a></div>

@@ -73,7 +73,7 @@ async function irAPixelPay(page) {
   if (SAVE) await a.screenshot({ path: path.join(OUT, '40-pago-pixelpay.png') });
   const info = await a.evaluate(() => fetch('/api/registration').then((r) => r.json()));
   const orden = await irAPixelPay(a);
-  assert.ok(orden._order_id.startsWith('INS-'), 'order_id propio');
+  assert.ok(orden._order_id.startsWith('SUS-'), 'order_id propio');
   assert.strictEqual(orden._amount, info.feeHnl.toFixed(2), 'monto fijado por el servidor (en lempiras)');
   assert.strictEqual(orden._currency, 'HNL');
   assert.ok(orden._complete.startsWith(`${BASE}/api/pixelpay/registro/`) && orden._callback === `${BASE}/api/pixelpay/aviso`);

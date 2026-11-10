@@ -7,7 +7,8 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Diversify.Delivery.Modules;
 
-// Inscripción del cliente (pago único de US$5). Dos formas de pago:
+// Suscripción mensual del cliente (US$5 por mes; ver Subscriptions en Loyalty.cs). Cada pago aprobado suma un mes,
+// también si se paga por adelantado. Dos formas de pago:
 //  - Tarjeta con PixelPay (ver PixelPay.cs). La app NUNCA recibe datos de tarjeta: el cliente paga en el checkout
 //    de PixelPay (Hosted Payment) y aquí solo se verifica el resultado (regreso del cliente y aviso de PixelPay).
 //    En desarrollo, sin PixelPay configurado, hay una pasarela simulada (Payments:Simulated=true) que aprueba al
@@ -39,7 +40,20 @@ public static class RegistrationEndpoints
         p.ReviewedBy = by;
         p.ReviewedAt = DateTime.Now;
         p.Notes = note;
-        p.User!.Status = AccountStatus.Activo;
+        Subscriptions.Extend(p.User!, DateTime.Now);
+    }
+
+    /// <summary>
+    /// Se puede pagar por adelantado solo el mes siguiente: si a la suscripción le quedan más días que esto, ya está
+    /// pagado (evita cobros repetidos por error).
+    /// </summary>
+    private static readonly TimeSpan MaxPrepaid = TimeSpan.FromDays(35);
+
+    private static void EnsureCanPay(User user)
+    {
+        AppException.ThrowIf(user.Status == AccountStatus.EnRevision, "Ya tienes un pago en revisión. Espera la confirmación.");
+        AppException.ThrowIf(user.SubscriptionEndsAt > DateTime.Now.Add(MaxPrepaid),
+            $"Ya pagaste el mes siguiente: tu suscripción está pagada hasta el {user.SubscriptionEndsAt:dd/MM/yyyy}.");
     }
 
     public static void Map(RouteGroupBuilder api)
@@ -50,12 +64,15 @@ public static class RegistrationEndpoints
         {
             var s = await db.Settings.OrderBy(x => x.Id).FirstAsync();
             var user = await db.Users.FindAsync(me.UserId());
+            if (Subscriptions.ExpireIfDue(user!, DateTime.Now)) await db.SaveChangesAsync();
             var last = await db.RegistrationPayments.Where(p => p.UserId == me.UserId() && p.Status != RegistrationPaymentStatus.Pendiente)
                 .OrderByDescending(p => p.Id).FirstOrDefaultAsync();
             var provider = CardProvider(pixel, config);
             return new
             {
                 status = user!.Status.ToString(),
+                subscriptionEndsAt = user.SubscriptionEndsAt,
+                canPayAhead = user.Status == AccountStatus.Activo && !(user.SubscriptionEndsAt > DateTime.Now.Add(MaxPrepaid)),
                 feeUsd = s.RegistrationFeeUsd,
                 feeHnl = Money.Round(s.RegistrationFeeUsd * s.ExchangeRate),
                 exchangeRate = s.ExchangeRate,
@@ -78,8 +95,7 @@ public static class RegistrationEndpoints
             var provider = CardProvider(pixel, config);
             AppException.ThrowIf(provider is null, "El pago con tarjeta aún no está disponible. Usa transferencia.");
             var user = await db.Users.FindAsync([me.UserId()], ct) ?? throw AppException.NotFound("Usuario");
-            AppException.ThrowIf(user.Status == AccountStatus.Activo, "Tu inscripción ya está pagada.");
-            AppException.ThrowIf(user.Status == AccountStatus.EnRevision, "Ya tienes un pago en revisión. Espera la confirmación.");
+            EnsureCanPay(user);
             var s = await db.Settings.OrderBy(x => x.Id).FirstAsync(ct);
             var hnl = Money.Round(s.RegistrationFeeUsd * s.ExchangeRate);
 
@@ -91,10 +107,10 @@ public static class RegistrationEndpoints
                     GatewayId = $"SIM-{DateTime.Now:yyMMddHHmmss}-{user.Id}", Status = RegistrationPaymentStatus.Aprobado,
                     ReviewedBy = "Pasarela de prueba", ReviewedAt = DateTime.Now,
                 });
-                user.Status = AccountStatus.Activo;
+                Subscriptions.Extend(user, DateTime.Now);
                 await db.SaveChangesAsync(ct);
                 cache.Remove(SecurityExtensions.SessionCacheKey(user.Id));
-                return Results.Ok(new { provider, approved = true, status = user.Status.ToString() });
+                return Results.Ok(new { provider, approved = true, status = user.Status.ToString(), subscriptionEndsAt = user.SubscriptionEndsAt });
             }
 
             AppException.ThrowIf(string.IsNullOrWhiteSpace(user.Email), "Agrega tu correo en Mi cuenta para pagar con tarjeta.");
@@ -102,13 +118,13 @@ public static class RegistrationEndpoints
             var payment = new RegistrationPayment
             {
                 UserId = user.Id, Method = "Tarjeta", AmountUsd = s.RegistrationFeeUsd, AmountHnl = hnl, Status = RegistrationPaymentStatus.Pendiente,
-                OrderId = $"INS-{user.Id}-{DateTime.Now:yyMMddHHmmss}-{RandomNumberGenerator.GetHexString(4)}",
+                OrderId = $"SUS-{user.Id}-{DateTime.Now:yyMMddHHmmss}-{RandomNumberGenerator.GetHexString(4)}",
             };
             db.RegistrationPayments.Add(payment);
             await db.SaveChangesAsync(ct);
 
             var site = HostingSecurity.PublicBaseUrl(config, http);
-            var title = $"Inscripción {s.StoreName}";
+            var title = $"Suscripción mensual {s.StoreName}";
             try
             {
                 var url = await pixel.CreateCheckoutAsync(new HostedOrder(payment.OrderId, ExpectedAmount(payment, pixel),
@@ -130,7 +146,9 @@ public static class RegistrationEndpoints
         {
             var reference = Text.Required(input.Reference, 80, "El número de referencia");
             var user = await db.Users.FindAsync(me.UserId()) ?? throw AppException.NotFound("Usuario");
-            AppException.ThrowIf(user.Status == AccountStatus.Activo, "Tu inscripción ya está pagada.");
+            EnsureCanPay(user);
+            AppException.ThrowIf(await db.RegistrationPayments.AnyAsync(p => p.UserId == user.Id && p.Status == RegistrationPaymentStatus.EnRevision),
+                "Ya tienes una transferencia en revisión. Espera la confirmación.");
             AppException.ThrowIf(await db.RegistrationPayments.AnyAsync(p => p.Reference == reference && p.Status != RegistrationPaymentStatus.Rechazado),
                 "Esa referencia ya fue registrada.");
             var s = await db.Settings.OrderBy(x => x.Id).FirstAsync();
@@ -139,7 +157,8 @@ public static class RegistrationEndpoints
                 UserId = user.Id, Method = "Transferencia", AmountUsd = s.RegistrationFeeUsd, AmountHnl = Money.Round(s.RegistrationFeeUsd * s.ExchangeRate),
                 Reference = reference, Status = RegistrationPaymentStatus.EnRevision,
             });
-            user.Status = AccountStatus.EnRevision;
+            // Si ya tiene la suscripción vigente (pago por adelantado), sigue pidiendo mientras se revisa.
+            if (user.Status != AccountStatus.Activo) user.Status = AccountStatus.EnRevision;
             await db.SaveChangesAsync();
             cache.Remove(SecurityExtensions.SessionCacheKey(user.Id));
             return new { status = user.Status.ToString() };
@@ -209,7 +228,7 @@ public static class RegistrationEndpoints
                 {
                     // Pagado, pero no por lo esperado: lo decide el master al verlo en el portal de PixelPay.
                     p.Status = RegistrationPaymentStatus.EnRevision;
-                    p.User!.Status = AccountStatus.EnRevision;
+                    if (p.User!.Status != AccountStatus.Activo && p.User.Status != AccountStatus.Suspendido) p.User.Status = AccountStatus.EnRevision;
                     p.Notes = $"PixelPay avisó un pago de {currency} {paid:N2}; se esperaba {pixel.Currency} {expected:N2}.";
                 }
                 else Approve(p, "PixelPay", "Aprobado por PixelPay (aviso del servidor).");
@@ -237,7 +256,7 @@ public static class RegistrationEndpoints
             p.ReviewedBy = me.DisplayName();
             p.ReviewedAt = DateTime.Now;
             p.Notes = Text.Clean(input.Notes, 300);
-            p.User!.Status = AccountStatus.Activo;
+            Subscriptions.Extend(p.User!, DateTime.Now);
             await db.SaveChangesAsync();
             cache.Remove(SecurityExtensions.SessionCacheKey(p.UserId));
             return ToDto(p);

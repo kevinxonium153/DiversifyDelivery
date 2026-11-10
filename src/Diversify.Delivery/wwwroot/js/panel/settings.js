@@ -1,4 +1,4 @@
-// Ajustes de la tienda (envío, mínimo, horario, inscripción, cuenta bancaria) y conexión con Diversify POS.
+// Ajustes de la tienda (envío, mínimo, horario, suscripción, puntos, cuenta bancaria) y conexión con Diversify POS.
 import { api } from '../api.js';
 import { esc, icon, money, formData, attempt, fmtDateTime, toast } from '../ui.js';
 
@@ -20,10 +20,14 @@ export default {
         <div class="grid-3"><label class="field"><span>Costo de envío (L)</span><input name="deliveryFee" type="number" step="0.01" min="0" value="${s.deliveryFee}"></label>
           <label class="field"><span>Pedido mínimo (L)</span><input name="minimumOrder" type="number" step="0.01" min="0" value="${s.minimumOrder}"></label>
           <label class="field"><span>Envío gratis desde (L)</span><input name="freeDeliveryFrom" type="number" step="0.01" min="0" value="${s.freeDeliveryFrom}"></label></div>
-        <h3>Inscripción de clientes</h3>
-        <div class="grid-2"><label class="field"><span>Inscripción (US$)</span><input name="registrationFeeUsd" type="number" step="0.01" min="0" value="${s.registrationFeeUsd}"></label>
+        <h3>Suscripción de clientes</h3>
+        <div class="grid-2"><label class="field"><span>Suscripción mensual (US$)</span><input name="registrationFeeUsd" type="number" step="0.01" min="0" value="${s.registrationFeeUsd}"></label>
           <label class="field"><span>Tipo de cambio (L por US$)</span><input name="exchangeRate" type="number" step="0.0001" min="0.01" value="${s.exchangeRate}"></label></div>
-        <p class="small muted" style="margin:-4px 0 0">Se cobra ${money(s.registrationFeeUsd * s.exchangeRate)} al cambio actual.</p>
+        <p class="small muted" style="margin:-4px 0 0">Se cobran ${money(s.registrationFeeUsd * s.exchangeRate)} al mes al cambio actual.</p>
+        <h3>Puntos (1 punto = L 1)</h3>
+        <div class="grid-2"><label class="field"><span>Puntos por compra (% del total)</span><input name="pointsPercent" type="number" step="0.1" min="0" max="20" value="${s.pointsPercent}"></label>
+          <label class="field"><span>Puntos por invitado (% de sus compras)</span><input name="referralPercent" type="number" step="0.1" min="0" max="20" value="${s.referralPercent}"></label></div>
+        <p class="small muted" style="margin:-4px 0 0">Se acreditan cuando el pedido se entrega. El segundo porcentaje lo gana quien invitó al cliente, en cada compra de ese cliente.</p>
         <label class="field"><span>Datos para transferencias (banco, cuenta, titular)</span><textarea name="bankInstructions">${esc(s.bankInstructions || '')}</textarea></label>
         <input type="hidden" name="storeLatitude" value="${s.storeLatitude ?? ''}"><input type="hidden" name="storeLongitude" value="${s.storeLongitude ?? ''}">
         <label class="check"><input type="checkbox" name="syncPrices" ${s.syncPrices ? 'checked' : ''}> <span>La sincronización con Diversify POS también actualiza precios<br><span class="small muted">Los que cambies a mano aquí no se tocan.</span></span></label>

@@ -1,6 +1,6 @@
 // Recorrido completo de Diversify Delivery con Playwright + capturas para docs/capturas.
 //
-//   1. Cliente nuevo: se registra, paga la inscripción (pasarela de prueba), arma el carrito,
+//   1. Cliente nuevo: se registra, paga la suscripción mensual (pasarela de prueba), arma el carrito,
 //      agrega su dirección con GPS y hace el pedido.
 //   2. Master: ve el tablero, ajusta el pedido, lo marca listo y revisa productos, clientes y ajustes.
 //   3. Repartidor: toma el pedido, va en camino y lo entrega con el código del cliente.
@@ -57,7 +57,7 @@ async function shot(page, name, full = false) {
   await c.waitForSelector('.pay-amount');
   await shot(c, '03-inscripcion-5-dolares');
   await c.click('#pay-card');
-  await c.waitForSelector('text=¡Tu cuenta está activa!');
+  await c.waitForSelector('text=Tu suscripción está activa');
 
   await c.goto(BASE + '/#/');
   await c.waitForSelector('.product [data-add]');

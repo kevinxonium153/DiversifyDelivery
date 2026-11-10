@@ -8,7 +8,7 @@ Integración: `docs/INTEGRACION-DIVERSIFY.md`. Servidor: `docs/DESPLIEGUE-PROXMO
 
 - Tienda en línea + pedidos a domicilio de un supermercado de **Honduras** (lempiras, ISV 0/15/18 %), conectada a
   **Diversify POS** (repositorio `kevinxonium153/Diversifyfin1`, rama de desarrollo `betas`).
-- Tres roles: `cliente` (tienda, inscripción de US$5), `master` (panel) y `repartidor` (app de entregas).
+- Tres roles: `cliente` (tienda, suscripción mensual de US$5, puntos), `master` (panel) y `repartidor` (app de entregas).
 - Desarrolla **PolyMorpha**. Todo en **español**: interfaz, errores, comentarios, documentación y commits.
 - La demo es un negocio ficticio, "Súper La Esperanza". Nunca usar "Diversify" como nombre de tienda.
 
@@ -38,25 +38,31 @@ Datos locales en `src/Diversify.Delivery/data/` (ignorado por git).
 
 - ASP.NET Core 10 Minimal APIs, EF Core + SQLite, una sola base `delivery.db`. Cookie `diversify.delivery`.
 - `Core/Entities.cs`: User (Role, Status), Category, Product, PriceChange, Address, Order, OrderItem, OrderEvent,
-  RegistrationPayment, StoreSettings (una fila).
+  RegistrationPayment, PointsEntry, StoreSettings (una fila).
 - `Core/SchemaUpgrades.cs`: columnas nuevas en tablas existentes **se declaran ahí** (tablas nuevas se crean solas).
   Nunca borrar ni renombrar columnas.
 - `Core/Security.cs`: roles, `RequireRoles`, sesión validada cada 30 s (suspender o cambiar contraseña la cierra;
   aprobar el pago la renueva). Tras cambiar un usuario: `cache.Remove(SessionCacheKey(id))`.
 - `Core/Hosting.cs`: CSP estricta, límites de intentos, validación de producción.
 - Errores: `AppException(mensaje, status)` → `{ "error": "..." }`.
-- Módulos: `AuthEndpoints`, `RegistrationEndpoints` (inscripción, `IPaymentGateway`), `CatalogEndpoints`
+- Módulos: `AuthEndpoints`, `RegistrationEndpoints` (pagos de la suscripción), `Loyalty` (puntos, referidos y
+  `Subscriptions`), `CatalogEndpoints`
   (público + master), `Orders` (cliente, master, repartidor; reglas y estados), `AdminEndpoints`, `DiversifySync`.
 
 ### Reglas de negocio
 
 - Estados: Recibido → Preparando → Listo → EnCamino → Entregado | Cancelado. Transiciones del master en
   `Orders.MasterTransitions`; el repartidor: take/release/pickup/deliver.
-- Solo clientes con `Status = Activo` (inscripción pagada) pueden pedir. Horario y pausa en `StoreSettings`.
+- Solo clientes con `Status = Activo` y `SubscriptionEndsAt` vigente pueden pedir. Horario y pausa en `StoreSettings`.
+- **Suscripción mensual** (Decisión 006): cada pago aprobado llama a `Subscriptions.Extend` (+1 mes); al vencer pasa a
+  `PendientePago` (`SubscriptionExpiryWorker`). Solo se adelanta el mes siguiente.
+- **Puntos** (1 punto = L 1): `Loyalty.CreditDeliveredAsync` al entregar (master o repartidor): `PointsPercent` del
+  total para el cliente y `ReferralPercent` para quien lo invitó (`ReferredById`). El saldo es la suma de
+  `PointsEntries`; nunca editar saldos. Aún no se canjean. Prueba: `tests/puntos-suscripcion.cjs`.
 - Precios con ISV incluido. Total = subtotal (con lo realmente despachado) + envío (gratis desde
   `FreeDeliveryFrom`). Pedido mínimo sin envío.
 - **Código de entrega**: lo ven cliente y master; `ToDto(o, includePin: false)` para el repartidor. No romper.
-- Datos de tarjeta: **nunca** en esta app. Inscripción (pago único US$5) con **PixelPay Hosted Payment**: el
+- Datos de tarjeta: **nunca** en esta app. Suscripción (US$5 al mes) con **PixelPay Hosted Payment**: el
   servidor crea la orden firmada (HMAC SHA3-512) y el cliente paga en la página de PixelPay; se verifica
   `payment_hash` al regresar (`/api/pixelpay/registro/{id}/completo`) y en el aviso (`/api/pixelpay/aviso`).
   Código: `Modules/PixelPay.cs` + `RegistrationEndpoints`. Ver `docs/PIXELPAY.md` y la Decisión 005. Prueba:

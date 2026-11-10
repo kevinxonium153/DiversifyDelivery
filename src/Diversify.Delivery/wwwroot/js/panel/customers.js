@@ -1,9 +1,9 @@
-// Clientes e inscripciones ($5): aprobar o rechazar transferencias, suspender o reactivar cuentas.
+// Clientes y suscripciones ($5 al mes): aprobar o rechazar pagos, ver vencimiento, puntos e invitados; suspender o reactivar.
 import { api } from '../api.js';
-import { esc, icon, money, usd, statusBadge, fmtDateTime, modal, attempt, confirmDialog, waUrl, debounce } from '../ui.js';
+import { esc, icon, money, usd, statusBadge, fmtDateTime, fmtDate, modal, attempt, confirmDialog, waUrl, debounce } from '../ui.js';
 
 export default {
-  route: 'clientes', title: 'Clientes e inscripciones', icon: 'users',
+  route: 'clientes', title: 'Clientes y suscripciones', icon: 'users',
   async render(el, ctx) {
     el.innerHTML = `<section class="card" id="pending" style="margin-bottom:16px"></section>
       <div class="toolbar"><div class="search">${icon('search')}<input class="input" id="q" type="search" placeholder="Nombre, correo o teléfono"></div>
@@ -23,10 +23,11 @@ export default {
 
     const draw = async () => {
       const list = await attempt(() => api.get('/admin/customers', { search: el.querySelector('#q').value, status: el.querySelector('#st').value })) || [];
-      el.querySelector('#tbl').innerHTML = list.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>Teléfono</th><th>Registro</th><th>Estado</th><th class="num">Pedidos</th><th class="num">Compras</th><th></th></tr></thead><tbody>
-        ${list.map(({ user: u, orders, spent }) => `<tr data-user="${u.id}" data-status="${u.status}"><td><strong>${esc(u.fullName)}</strong><div class="small muted">${esc(u.email || u.login)}</div></td>
+      el.querySelector('#tbl').innerHTML = list.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Cliente</th><th>Teléfono</th><th>Registro</th><th>Estado</th><th>Suscripción hasta</th><th class="num">Pedidos</th><th class="num">Compras</th><th class="num">Puntos</th><th class="num">Invitados</th><th></th></tr></thead><tbody>
+        ${list.map(({ user: u, orders, spent, points, referrals }) => `<tr data-user="${u.id}" data-status="${u.status}"><td><strong>${esc(u.fullName)}</strong><div class="small muted">${esc(u.email || u.login)}</div></td>
           <td>${u.phone ? `<a href="${waUrl(u.phone)}" target="_blank" rel="noopener">${esc(u.phone)}</a>` : '—'}</td><td>${fmtDateTime(u.createdAt)}</td><td>${statusBadge(u.status)}</td>
-          <td class="num">${orders}</td><td class="num">${money(spent)}</td>
+          <td class="small">${u.subscriptionEndsAt ? `${fmtDate(u.subscriptionEndsAt)}${new Date(u.subscriptionEndsAt) < new Date() ? ' <span class="muted">(vencida)</span>' : ''}` : '—'}</td>
+          <td class="num">${orders}</td><td class="num">${money(spent)}</td><td class="num">${Number(points).toFixed(2)}</td><td class="num">${referrals}<div class="small muted mono">${esc(u.referralCode || '')}</div></td>
           <td class="right">${u.status === 'Suspendido' ? '<button class="btn sm" data-toggle>Reactivar</button>' : u.status === 'Activo' ? '<button class="btn sm ghost" data-toggle>Suspender</button>' : ''}</td></tr>`).join('')}
         </tbody></table></div><p class="small muted">${list.length} clientes</p>` : '<div class="empty">Sin clientes con esos filtros.</div>';
     };
@@ -34,11 +35,11 @@ export default {
     el.addEventListener('click', async (e) => {
       const row = e.target.closest('tr');
       if (e.target.closest('[data-approve]')) {
-        if (await attempt(() => api.post(`/admin/registrations/${row.dataset.id}/approve`, {}), 'Inscripción aprobada. La cuenta ya puede pedir.')) { drawPending(); draw(); ctx.refreshCounts(); }
+        if (await attempt(() => api.post(`/admin/registrations/${row.dataset.id}/approve`, {}), 'Pago aprobado: se sumó un mes a la suscripción.')) { drawPending(); draw(); ctx.refreshCounts(); }
       }
       if (e.target.closest('[data-reject]')) {
         modal({
-          title: 'Rechazar transferencia',
+          title: 'Rechazar pago',
           body: '<label class="field"><span>Motivo (el cliente lo verá)</span><textarea id="n">No encontramos la transferencia con esa referencia.</textarea></label>',
           actions: [{ label: 'Volver' }, { label: 'Rechazar', kind: 'danger', onClick: async (close, mel) => {
             if (await attempt(() => api.post(`/admin/registrations/${row.dataset.id}/reject`, { notes: mel.querySelector('#n').value }), 'Pago rechazado.')) { drawPending(); draw(); ctx.refreshCounts(); return undefined; }

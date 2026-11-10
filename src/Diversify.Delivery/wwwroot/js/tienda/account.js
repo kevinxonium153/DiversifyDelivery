@@ -1,7 +1,7 @@
-// Ingresar, crear cuenta, pagar la inscripción ($5) y Mi cuenta (datos y direcciones).
+// Ingresar, crear cuenta (con código de invitación), suscripción mensual ($5) y Mi cuenta (datos y direcciones).
 import { api } from '../api.js';
 import { logoDelivery } from '../brand.js';
-import { esc, icon, money, usd, formData, attempt, toast, confirmDialog, statusBadge } from '../ui.js';
+import { esc, icon, money, usd, formData, attempt, toast, confirmDialog, statusBadge, fmtDay } from '../ui.js';
 import { state, loadSession } from './state.js';
 import { addressModal } from './checkout.js';
 
@@ -35,17 +35,23 @@ export function renderLogin(view, ctx) {
   });
 }
 
-export function renderRegister(view, ctx) {
+export function renderRegister(view, ctx, ref) {
   const s = state.store;
+  // El código del enlace de invitación se recuerda aunque la persona navegue antes de registrarse.
+  try { if (ref) sessionStorage.setItem('dd.ref', ref.toUpperCase()); } catch { /* modo privado */ }
+  let code = ref || '';
+  try { code = code || sessionStorage.getItem('dd.ref') || ''; } catch { /* modo privado */ }
   view.innerHTML = `<div class="auth-wrap" style="min-height:auto;padding-top:20px">
     <form class="auth-card glass" id="register">
       <div class="brand">${logoDelivery({ height: 48 })}<h1 style="font-size:22px;margin:10px 0 0">Crea tu cuenta</h1>
-        <div class="steps-reg"><span class="on"><b>1</b> Tus datos</span> → <span><b>2</b> Inscripción ${usd(s.registrationFeeUsd)}</span> → <span><b>3</b> ¡A comprar!</span></div></div>
+        <div class="steps-reg"><span class="on"><b>1</b> Tus datos</span> → <span><b>2</b> Suscripción ${usd(s.registrationFeeUsd)}/mes</span> → <span><b>3</b> ¡A comprar!</span></div></div>
+      ${code ? `<div class="alert ok small">${icon('gift')}<div>Te invitaron con el código <strong>${esc(code.toUpperCase())}</strong>.</div></div>` : ''}
       <label class="field"><span>Nombre completo</span><input name="fullName" autocomplete="name" required maxlength="120"></label>
       <label class="field"><span>Correo electrónico</span><input name="email" type="email" autocomplete="email" required maxlength="120"></label>
       <label class="field"><span>Teléfono (WhatsApp)</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="9999-9999" required maxlength="30"></label>
       <label class="field"><span>Contraseña (mínimo 8 caracteres)</span><input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
-      <label class="check small"><input type="checkbox" required> <span>Acepto los términos del servicio y entiendo que la inscripción de <strong>${usd(s.registrationFeeUsd)} (${money(s.registrationFeeHnl)})</strong> es un pago único y no reembolsable.</span></label>
+      <label class="field"><span>Código de invitación (opcional)</span><input name="referralCode" maxlength="12" autocapitalize="characters" value="${esc(code.toUpperCase())}" placeholder="Si alguien te invitó"></label>
+      <label class="check small"><input type="checkbox" required> <span>Acepto los términos del servicio y la <strong>suscripción mensual de ${usd(s.registrationFeeUsd)} (${money(s.registrationFeeHnl)})</strong>. Se paga cada mes con tarjeta o transferencia; si no la renuevas, solo dejas de poder pedir.</span></label>
       <button class="btn primary lg block">Continuar</button>
       <p class="small muted" style="text-align:center;margin:0">¿Ya tienes cuenta? <a href="#/ingresar">Ingresa</a></p>
     </form></div>`;
@@ -53,46 +59,59 @@ export function renderRegister(view, ctx) {
     e.preventDefault();
     const user = await attempt(() => api.post('/auth/register', formData(e.target)));
     if (!user) return;
+    try { sessionStorage.removeItem('dd.ref'); } catch { /* modo privado */ }
     state.user = user;
     ctx.refreshBar();
     ctx.navigate('#/inscripcion');
   });
 }
 
+// Suscripción mensual: primer pago, renovación (vencida) o pago por adelantado (activa).
 // result: lo que pasó en el checkout de PixelPay (#/inscripcion/ok | cancelado | error).
 export async function renderInscription(view, ctx, result) {
   if (state.user.role !== 'cliente') { ctx.navigate('#/'); return; }
   const info = await attempt(() => api.get('/registration'));
   if (!info) return;
-  if (info.status === 'Activo') {
-    if (result === 'ok' && state.user.status !== 'Activo') { await loadSession(); ctx.refreshBar(); }
-    view.innerHTML = `<div class="auth-wrap" style="min-height:auto"><div class="auth-card glass" style="text-align:center">
-      <div style="font-size:56px">🎉</div><h1 style="font-size:22px">${result === 'ok' ? '¡Pago aprobado!' : '¡Tu cuenta está activa!'}</h1>
-      <p class="muted">Ya puedes hacer pedidos.</p><a class="btn primary lg block" href="#/">Ir a comprar</a></div></div>`;
-    return;
-  }
+  if (state.user.status !== info.status || state.user.subscriptionEndsAt !== info.subscriptionEndsAt) { await loadSession(); ctx.refreshBar(); }
+  const active = info.status === 'Activo';
+  const reviewing = info.status === 'EnRevision';
+  const first = !info.subscriptionEndsAt;
   const last = info.lastPayment;
+  const days = info.subscriptionEndsAt ? Math.ceil((new Date(info.subscriptionEndsAt) - Date.now()) / 86400000) : 0;
+  const price = `${usd(info.feeUsd)} al mes`;
+
+  const methods = `<div class="stack">
+      <label class="option"><input type="radio" name="m" value="card" ${info.card.enabled ? 'checked' : 'disabled'}>${icon('card', 'lead')}
+        <div class="grow"><div class="t">Tarjeta de crédito o débito</div><div class="small muted">${info.card.enabled ? 'Aprobación inmediata con PixelPay.' : 'Disponible pronto.'}</div></div></label>
+      <label class="option"><input type="radio" name="m" value="transfer" ${info.card.enabled ? '' : 'checked'}>${icon('bank', 'lead')}
+        <div class="grow"><div class="t">Transferencia o depósito</div><div class="small muted">${active ? 'Se suma un mes cuando confirmamos el pago.' : 'Se activa cuando confirmamos el pago.'}</div></div></label>
+    </div><div id="pay-box"></div>`;
+
+  const head = active
+    ? `<div style="font-size:52px">${result === 'ok' ? '🎉' : '✅'}</div>
+       <h1 style="font-size:22px;margin:6px 0 0">${result === 'ok' ? '¡Pago aprobado!' : 'Tu suscripción está activa'}</h1>
+       <p style="margin:6px 0 0">Pagada hasta el <strong>${fmtDay(info.subscriptionEndsAt)}</strong>${days > 0 ? ` <span class="muted">(${days} ${days === 1 ? 'día' : 'días'})</span>` : ''}.</p>`
+    : `${first ? '<div class="steps-reg"><span><b>✓</b> Tus datos</span> → <span class="on"><b>2</b> Suscripción</span> → <span><b>3</b> ¡A comprar!</span></div>' : ''}
+       <h1 style="font-size:22px;margin:10px 0 0">${first ? 'Activa tu cuenta' : 'Renueva tu suscripción'}</h1>
+       <p class="muted" style="margin:0">Suscripción mensual para comprar en línea y recibir a domicilio. Además ganas puntos con cada compra.</p>
+       <div class="pay-amount">${usd(info.feeUsd)}<span class="small muted" style="font-size:16px;font-weight:600"> / mes</span></div>
+       <div class="muted small">${money(info.feeHnl)} al cambio de L ${info.exchangeRate}</div>`;
+
   view.innerHTML = `<div class="auth-wrap" style="min-height:auto;padding-top:10px">
     <div class="auth-card glass" style="width:min(520px,100%)">
-      <div class="brand"><div class="steps-reg"><span><b>✓</b> Tus datos</span> → <span class="on"><b>2</b> Inscripción</span> → <span><b>3</b> ¡A comprar!</span></div>
-        <h1 style="font-size:22px;margin:10px 0 0">Activa tu cuenta</h1>
-        <p class="muted" style="margin:0">Inscripción única para comprar en línea y recibir a domicilio.</p>
-        <div class="pay-amount">${usd(info.feeUsd)}</div><div class="muted small">${money(info.feeHnl)} al cambio de L ${info.exchangeRate}</div></div>
+      <div class="brand" ${active ? 'style="text-align:center"' : ''}>${head}</div>
 
-      ${info.status === 'EnRevision' ? `<div class="alert info">${icon('clock')}<div><strong>Estamos verificando tu pago</strong>${last?.reference ? ` (ref. ${esc(last.reference)})` : ''}. Normalmente toma menos de una hora en horario de tienda.</div></div>` : ''}
-      ${result === 'cancelado' && info.status !== 'EnRevision' ? `<div class="alert info">${icon('info')}<div><strong>No se hizo ningún cobro.</strong> Cancelaste el pago en PixelPay; puedes intentarlo de nuevo cuando quieras.</div></div>` : ''}
-      ${result === 'error' && info.status !== 'EnRevision' ? `<div class="alert err">${icon('alert')}<div><strong>No pudimos confirmar el pago con PixelPay.</strong> Si se hizo el cargo a tu tarjeta, escríbenos y lo revisamos; si no, intenta de nuevo.</div></div>` : ''}
-      ${last?.status === 'Rechazado' ? `<div class="alert err">${icon('alert')}<div><strong>No pudimos confirmar tu pago anterior.</strong> ${esc(last.notes || '')}</div></div>` : ''}
+      ${!active && !first && !reviewing ? `<div class="alert warn">${icon('clock')}<div><strong>Tu suscripción venció el ${fmtDay(info.subscriptionEndsAt)}.</strong> Renuévala para seguir pidiendo. Tus puntos se conservan.</div></div>` : ''}
+      ${reviewing ? `<div class="alert info">${icon('clock')}<div><strong>Estamos verificando tu pago</strong>${last?.reference ? ` (ref. ${esc(last.reference)})` : ''}. Normalmente toma menos de una hora en horario de tienda.</div></div>` : ''}
+      ${result === 'cancelado' && !reviewing ? `<div class="alert info">${icon('info')}<div><strong>No se hizo ningún cobro.</strong> Cancelaste el pago en PixelPay; puedes intentarlo de nuevo cuando quieras.</div></div>` : ''}
+      ${result === 'error' && !reviewing ? `<div class="alert err">${icon('alert')}<div><strong>No pudimos confirmar el pago con PixelPay.</strong> Si se hizo el cargo a tu tarjeta, escríbenos y lo revisamos; si no, intenta de nuevo.</div></div>` : ''}
+      ${last?.status === 'Rechazado' && !active ? `<div class="alert err">${icon('alert')}<div><strong>No pudimos confirmar tu pago anterior.</strong> ${esc(last.notes || '')}</div></div>` : ''}
 
-      ${info.status !== 'EnRevision' ? `
-      <div class="stack">
-        <label class="option"><input type="radio" name="m" value="card" ${info.card.enabled ? 'checked' : 'disabled'}>${icon('card', 'lead')}
-          <div class="grow"><div class="t">Tarjeta de crédito o débito</div><div class="small muted">${info.card.enabled ? 'Aprobación inmediata con PixelPay.' : 'Disponible pronto.'}</div></div></label>
-        <label class="option"><input type="radio" name="m" value="transfer" ${info.card.enabled ? '' : 'checked'}>${icon('bank', 'lead')}
-          <div class="grow"><div class="t">Transferencia o depósito</div><div class="small muted">Se activa cuando confirmamos el pago.</div></div></label>
-      </div>
-      <div id="pay-box"></div>` : `<button class="btn block" id="refresh">${icon('sync')} Revisar estado</button>`}
-      <a class="small" href="#/" style="text-align:center">Seguir viendo el catálogo</a>
+      ${active ? `<a class="btn primary lg block" href="#/">Ir a comprar</a>
+        ${info.canPayAhead ? `<details class="pay-ahead"><summary>Pagar el siguiente mes por adelantado (${price})</summary>${methods}</details>`
+          : '<p class="small muted" style="text-align:center;margin:0">Ya tienes pagado el mes siguiente.</p>'}`
+        : reviewing ? `<button class="btn block" id="refresh">${icon('sync')} Revisar estado</button>` : methods}
+      <a class="small" href="${active ? '#/puntos' : '#/'}" style="text-align:center">${active ? 'Ver mis puntos' : 'Seguir viendo el catálogo'}</a>
     </div></div>`;
 
   const box = view.querySelector('#pay-box');
@@ -116,8 +135,11 @@ export async function renderInscription(view, ctx, result) {
       btn.disabled = true;
       const r = await attempt(() => api.post('/registration/card'));
       if (r?.checkoutUrl) { location.href = r.checkoutUrl; return; }
-      if (r?.approved) { await loadSession(); ctx.refreshBar(); toast('¡Pago aprobado! Tu cuenta está activa.'); renderInscription(view, ctx); }
-      else btn.disabled = false;
+      if (r?.approved) {
+        await loadSession(); ctx.refreshBar();
+        toast(`¡Pago aprobado! Suscripción pagada hasta el ${fmtDay(r.subscriptionEndsAt)}.`);
+        renderInscription(view, ctx);
+      } else btn.disabled = false;
     });
     box.querySelector('#pay-transfer')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -138,7 +160,10 @@ export async function renderAccount(view, ctx) {
     <div class="page-head"><h1>Mi cuenta</h1>${statusBadge(u.status)}</div>
     <div class="two-col">
       <div class="stack">
-        ${u.status !== 'Activo' ? `<div class="alert warn">${icon('card')}<div>Tu cuenta aún no está activa. <a href="#/inscripcion">Completar inscripción</a></div></div>` : ''}
+        ${u.role === 'cliente' ? (u.status === 'Activo'
+          ? `<a class="card row between" href="#/inscripcion" style="text-decoration:none;color:inherit"><span>${icon('card')} Suscripción activa hasta el <strong>${fmtDay(u.subscriptionEndsAt)}</strong></span><span class="small">Pagar por adelantado →</span></a>`
+          : `<div class="alert warn">${icon('card')}<div>${u.subscriptionEndsAt ? `Tu suscripción venció el ${fmtDay(u.subscriptionEndsAt)}.` : 'Tu cuenta aún no está activa.'} <a href="#/inscripcion">${u.subscriptionEndsAt ? 'Renovar' : 'Pagar la suscripción'}</a></div></div>`) : ''}
+        ${u.role === 'cliente' ? `<a class="card row between" href="#/puntos" style="text-decoration:none;color:inherit"><span>${icon('star')} <strong>Mis puntos</strong> e invitar amigos</span><span class="small">Ver →</span></a>` : ''}
         <section class="card">
           <div class="card-title"><h2>${icon('pin')} Mis direcciones</h2><button class="btn sm" id="add">${icon('plus')} Agregar</button></div>
           <div class="stack" id="addrs">${addresses.length ? addresses.map((a) => `<div class="option" style="cursor:default">

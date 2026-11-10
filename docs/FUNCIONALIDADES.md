@@ -56,12 +56,28 @@ Escritorio, claro y oscuro:
 
 - **Catálogo público:** cualquiera ve productos y precios sin cuenta. Portada con ofertas (precio anterior tachado
   y % de descuento), lo más pedido y una fila por categoría. Búsqueda por nombre, código o código de barras.
-- **Registro + inscripción de US$5, pago único** (se muestra también en lempiras con el tipo de cambio del master):
+- **Registro + suscripción mensual de US$5** (se muestra también en lempiras con el tipo de cambio del master).
+  Cada pago suma un mes; se puede pagar el mes siguiente por adelantado. Al vencer, la cuenta no puede pedir
+  hasta renovar (conserva sus puntos). Formas de pago:
   - **Tarjeta con PixelPay:** el cliente paga en la página segura de PixelPay (con 3-D Secure) y vuelve solo a
     la tienda; la app nunca ve ni guarda la tarjeta. Aprobación inmediata, verificada en el servidor. Ver
     [PIXELPAY.md](PIXELPAY.md).
   - **Transferencia/depósito:** el cliente escribe la referencia y el master la aprueba al verla en el banco.
-  - Sin inscripción pagada se puede ver todo y llenar el carrito, pero no pedir.
+  - Sin suscripción vigente se puede ver todo y llenar el carrito, pero no pedir.
+- **Puntos** (1 punto = L 1), en "Mis puntos" (★ en la barra):
+  - El **2 % del total** de cada pedido entregado.
+  - El **2 % de cada compra** de las personas que se registren con su código de invitación (enlace
+    `/#/registro?ref=CÓDIGO`, para copiar o compartir por WhatsApp).
+  - Saldo, equivalente en lempiras, invitados y movimientos. El master cambia los porcentajes en Ajustes y ve los
+    puntos de cada cliente.
+  - Todavía no se pueden canjear (ver la [Decisión 006](../notas/Decisiones/006%20Suscripcion%20mensual%20y%20puntos.md)).
+
+| Mis puntos | Registro con invitación | Suscripción activa |
+|---|---|---|
+| ![](capturas/60-mis-puntos.png) | ![](capturas/61-registro-con-invitacion.png) | ![](capturas/62-suscripcion-activa.png) |
+
+![Clientes con suscripción, puntos e invitados](capturas/63-panel-clientes-puntos.png)
+
 - **Carrito** guardado en el celular: por libra se pide de media en media libra; aviso de cuánto falta para el
   envío gratis y del pedido mínimo.
 - **Direcciones** con nombre (Casa, Trabajo), colonia, referencias ("portón negro frente a la pulpería") y

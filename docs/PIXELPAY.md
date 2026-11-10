@@ -1,7 +1,13 @@
-# Cobro de la inscripción con PixelPay
+# Cobro de la suscripción con PixelPay
 
-La inscripción de los clientes es un **pago único de US$5** (se cobra en lempiras al tipo de cambio de Ajustes, o
-en dólares si el comercio lo tiene habilitado). Se paga con tarjeta por **PixelPay** o por transferencia.
+La suscripción de los clientes es de **US$5 al mes** (se cobra en lempiras al tipo de cambio de Ajustes, o en
+dólares si el comercio lo tiene habilitado). Se paga con tarjeta por **PixelPay** o por transferencia. Cada pago
+aprobado suma un mes (ver [Decisión 006](../notas/Decisiones/006%20Suscripcion%20mensual%20y%20puntos.md)). El
+número de orden empieza con `SUS-`.
+
+**Cobro automático:** hoy cada mes se paga a mano. PixelPay ofrece "Cobros recurrentes" (API en beta,
+`api/v2/subscriptions`, recurrencia mensual y webhook por cada cobro). Para usarlo, el aviso de cada cobro debe
+llamar a `Subscriptions.Extend`, igual que hoy.
 
 La integración es **Hosted Payment**: el cliente escribe la tarjeta en la página de pago de PixelPay, no en la
 nuestra. Es lo que recomienda la documentación oficial de PixelPay cuando el comercio no quiere manejar datos de

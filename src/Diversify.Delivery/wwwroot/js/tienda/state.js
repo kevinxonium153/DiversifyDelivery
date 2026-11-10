@@ -6,7 +6,7 @@ const listeners = new Set();
 
 export const state = {
   user: null,     // null = visitante
-  store: null,    // ajustes públicos (envío, mínimo, horario, inscripción)
+  store: null,    // ajustes públicos (envío, mínimo, horario, suscripción, % de puntos)
   cart: loadCart(),
 };
 

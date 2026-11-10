@@ -5,7 +5,7 @@ Desarrolla **PolyMorpha** (San Pedro Sula).
 
 | Quién | Dónde entra | Qué hace |
 |---|---|---|
-| **Cliente final** | `https://delivery.diversify.hn/` | Ve el catálogo sin cuenta. Se registra, paga una **inscripción única de US$5** (tarjeta con **PixelPay** o transferencia) y hace pedidos con dirección, ubicación GPS e instrucciones. Sigue su pedido en vivo. |
+| **Cliente final** | `https://delivery.diversify.hn/` | Ve el catálogo sin cuenta. Se registra, paga una **suscripción mensual de US$5** (tarjeta con **PixelPay** o transferencia), gana **puntos** (2 % de cada compra y 2 % de las compras de quienes invita) y hace pedidos con dirección, ubicación GPS e instrucciones. Sigue su pedido en vivo. |
 | **Master** (administrador) | `/panel/` | Sube productos y fotos, cambia precios (uno por uno o por porcentaje), atiende pedidos en un tablero, asigna repartidores, aprueba inscripciones y configura la tienda. |
 | **Repartidor** | `/repartidor/` (celular) | Toma pedidos, ve instrucciones, referencias y ubicación, abre Google Maps o Waze, llama o escribe por WhatsApp al cliente y confirma la entrega con el código del cliente. |
 

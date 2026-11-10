@@ -9,7 +9,8 @@ namespace Diversify.Delivery.Modules;
 public record StaffInput(string Login, string FullName, string Role, string? Phone, string? Vehicle, string? Password, string Status = "Activo");
 public record SettingsInput(string StoreName, string? StorePhone, string? StoreAddress, double? StoreLatitude, double? StoreLongitude,
     decimal DeliveryFee, decimal MinimumOrder, decimal FreeDeliveryFrom, decimal RegistrationFeeUsd, decimal ExchangeRate,
-    string? BankInstructions, string OpensAt, string ClosesAt, bool AcceptingOrders, bool SyncPrices);
+    string? BankInstructions, string OpensAt, string ClosesAt, bool AcceptingOrders, bool SyncPrices,
+    decimal PointsPercent = 2, decimal ReferralPercent = 2);
 
 /// <summary>Usuarios (master y repartidores), clientes y ajustes de la tienda.</summary>
 public static class AdminEndpoints
@@ -72,11 +73,19 @@ public static class AdminEndpoints
             var stats = await db.Orders.Where(o => ids.Contains(o.CustomerId) && o.Status == OrderStatus.Entregado)
                 .GroupBy(o => o.CustomerId).Select(x => new { x.Key, n = x.Count(), total = x.Sum(o => (double)o.Total) })
                 .ToDictionaryAsync(x => x.Key);
+            var points = await db.PointsEntries.Where(p => ids.Contains(p.UserId))
+                .GroupBy(p => p.UserId).Select(x => new { x.Key, total = x.Sum(p => (double)p.Points) })
+                .ToDictionaryAsync(x => x.Key, x => Money.Round((decimal)x.total));
+            var referrals = await db.Users.Where(u => u.ReferredById != null && ids.Contains(u.ReferredById.Value))
+                .GroupBy(u => u.ReferredById!.Value).Select(x => new { x.Key, n = x.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.n);
             return list.Select(u => new
             {
                 user = u.ToDto(),
                 orders = stats.TryGetValue(u.Id, out var s) ? s.n : 0,
                 spent = stats.TryGetValue(u.Id, out var s2) ? Money.Round((decimal)s2.total) : 0,
+                points = points.GetValueOrDefault(u.Id),
+                referrals = referrals.GetValueOrDefault(u.Id),
             });
         });
 
@@ -106,6 +115,10 @@ public static class AdminEndpoints
             s.MinimumOrder = Money.Round(input.MinimumOrder);
             s.FreeDeliveryFrom = Money.Round(input.FreeDeliveryFrom);
             s.RegistrationFeeUsd = Money.Round(input.RegistrationFeeUsd);
+            AppException.ThrowIf(input.PointsPercent is < 0 or > 20 || input.ReferralPercent is < 0 or > 20,
+                "Los porcentajes de puntos deben estar entre 0 % y 20 %.");
+            s.PointsPercent = Math.Round(input.PointsPercent, 2);
+            s.ReferralPercent = Math.Round(input.ReferralPercent, 2);
             s.ExchangeRate = Math.Round(input.ExchangeRate, 4);
             s.BankInstructions = Text.Clean(input.BankInstructions, 500);
             AppException.ThrowIf(!TimeOnly.TryParse(input.OpensAt, out _) || !TimeOnly.TryParse(input.ClosesAt, out _), "El horario debe tener formato HH:MM.");

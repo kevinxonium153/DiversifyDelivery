@@ -10,15 +10,16 @@ using Microsoft.Extensions.Caching.Memory;
 namespace Diversify.Delivery.Modules;
 
 public record LoginRequest(string Login, string Password);
-public record RegisterRequest(string FullName, string Email, string Phone, string Password);
+public record RegisterRequest(string FullName, string Email, string Phone, string Password, string? ReferralCode = null);
 public record ProfileInput(string FullName, string? Phone, string? CurrentPassword, string? NewPassword);
 public record UserDto(int Id, string Login, string FullName, string? Email, string? Phone, string Role, string Status,
-    string? Vehicle, bool OnDuty, DateTime CreatedAt);
+    string? Vehicle, bool OnDuty, DateTime CreatedAt, DateTime? SubscriptionEndsAt, string? ReferralCode);
 
 public static class AuthEndpoints
 {
     public static UserDto ToDto(this User u) =>
-        new(u.Id, u.Login, u.FullName, u.Email, u.Phone, u.Role, u.Status.ToString(), u.Vehicle, u.OnDuty, u.CreatedAt);
+        new(u.Id, u.Login, u.FullName, u.Email, u.Phone, u.Role, u.Status.ToString(), u.Vehicle, u.OnDuty, u.CreatedAt,
+            u.SubscriptionEndsAt, u.ReferralCode);
 
     public static void Map(RouteGroupBuilder api)
     {
@@ -38,7 +39,8 @@ public static class AuthEndpoints
             return user.ToDto();
         }).RequireRateLimiting(HostingSecurity.LoginLimit);
 
-        // Registro de cliente: la cuenta queda "PendientePago" hasta pagar la inscripción ($5).
+        // Registro de cliente: la cuenta queda "PendientePago" hasta pagar el primer mes de la suscripción ($5).
+        // Con el código de otro cliente (enlace de invitación), ese cliente gana puntos con sus compras.
         auth.MapPost("/register", async (RegisterRequest req, DeliveryDbContext db, IPasswordHasher<User> hasher, HttpContext http) =>
         {
             var name = Text.Required(req.FullName, 120, "El nombre");
@@ -49,7 +51,20 @@ public static class AuthEndpoints
             AppException.ThrowIf((req.Password ?? "").Length < 8, "La contraseña debe tener al menos 8 caracteres.");
             AppException.ThrowIf(await db.Users.AnyAsync(u => u.Login == email), "Ya existe una cuenta con ese correo. Inicia sesión.");
 
-            var user = new User { Login = email, Email = email, FullName = name, Phone = phone, Role = Roles.Customer, Status = AccountStatus.PendientePago };
+            int? referredBy = null;
+            var code = Loyalty.NormalizeCode(req.ReferralCode);
+            if (code.Length > 0)
+            {
+                var referrer = await db.Users.FirstOrDefaultAsync(u => u.ReferralCode == code && u.Role == Roles.Customer && u.Status != AccountStatus.Suspendido);
+                AppException.ThrowIf(referrer is null, "El código de invitación no existe. Revísalo o déjalo vacío.");
+                referredBy = referrer.Id;
+            }
+
+            var user = new User
+            {
+                Login = email, Email = email, FullName = name, Phone = phone, Role = Roles.Customer, Status = AccountStatus.PendientePago,
+                ReferralCode = await Loyalty.NewCodeAsync(db), ReferredById = referredBy,
+            };
             user.PasswordHash = hasher.HashPassword(user, req.Password!);
             db.Users.Add(user);
             await db.SaveChangesAsync();

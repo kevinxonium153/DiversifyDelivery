@@ -15,7 +15,11 @@
   .shop-bar .search { grid-column: 1 / -1; grid-row: 2; max-width: none; }
   .shop-bar .tools { justify-self: end; }
   .shop-bar .tools .label { display: none; }
+  /* Cuatro botones (puntos, pedidos, cuenta, carrito) deben caber junto al logo en 360 px. */
+  .shop-bar .tools { gap: 2px; min-width: 0; }
+  .shop-bar .tools .btn { padding-inline: 9px; }
 }
+@media (max-width: 370px) { .shop-bar .brand-link svg { height: 32px; width: auto; } }
 
 .hero {
   position: relative; overflow: hidden; border-radius: var(--radius-xl); padding: 26px 24px; margin-bottom: 18px;
@@ -70,3 +74,21 @@
 .card-number { font-family: var(--mono); letter-spacing: .08em; }
 .pay-summary { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border-soft); }
 .pay-summary strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+
+/* Mis puntos */
+.points-hero { text-align: center; padding: 26px 18px; background: linear-gradient(135deg, var(--primary-soft), var(--surface)); }
+.points-balance { font-size: 52px; font-weight: 800; line-height: 1.1; letter-spacing: -1px; color: var(--text); }
+.points-value { color: var(--muted); margin-top: 6px; }
+.referral-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 30px; font-weight: 800; letter-spacing: 6px;
+  text-align: center; padding: 12px; border: 2px dashed var(--accent); border-radius: var(--radius); background: var(--surface-2); }
+.points-how { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.points-how li { display: flex; gap: 10px; align-items: flex-start; }
+.points-how .ico { color: var(--primary); flex: none; }
+.points-list { list-style: none; margin: 0; padding: 0; }
+.points-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.points-list li:last-child { border-bottom: 0; }
+.points-list .plus { color: var(--success); white-space: nowrap; }
+.points-list .minus { color: var(--danger); white-space: nowrap; }
+.pay-ahead { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; background: var(--surface); }
+.pay-ahead > summary { cursor: pointer; font-weight: 600; }
+.pay-ahead[open] > summary { margin-bottom: 12px; }

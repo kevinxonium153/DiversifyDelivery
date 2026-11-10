@@ -8,6 +8,7 @@ import { openCart } from './cart.js';
 import { renderCheckout } from './checkout.js';
 import { renderOrders, renderOrder } from './orders.js';
 import { renderLogin, renderRegister, renderInscription, renderAccount, renderForgot, renderReset } from './account.js';
+import { renderPoints } from './points.js';
 
 const view = document.getElementById('view');
 let cleanup = null;
@@ -24,11 +25,13 @@ const routes = [
   [/^#\/buscar\/(.+)$/, (m) => renderCatalog(view, ctx, { search: decodeURIComponent(m[1]) })],
   [/^#\/ofertas$/, () => renderCatalog(view, ctx, { offers: true })],
   [/^#\/ingresar$/, () => renderLogin(view, ctx)],
-  [/^#\/registro$/, () => renderRegister(view, ctx)],
+  // Enlace de invitación: #/registro?ref=CODIGO
+  [/^#\/registro(?:\?ref=([A-Za-z0-9]{1,12}))?$/, (m) => renderRegister(view, ctx, m[1])],
   [/^#\/recuperar$/, () => renderForgot(view, ctx)],
   [/^#\/restablecer\/([A-Za-z0-9_-]+)$/, (m) => renderReset(view, ctx, m[1])],
   [/^#\/inscripcion(?:\/(ok|cancelado|error))?$/, (m) => needUser() && renderInscription(view, ctx, m[1])],
   [/^#\/cuenta$/, () => needUser() && renderAccount(view, ctx)],
+  [/^#\/puntos$/, () => needUser() && renderPoints(view, ctx)],
   [/^#\/checkout$/, () => needUser() && renderCheckout(view, ctx)],
   [/^#\/pedidos$/, () => needUser() && renderOrders(view, ctx)],
   [/^#\/pedido\/(\d+)$/, (m) => needUser() && renderOrder(view, ctx, Number(m[1]))],
@@ -68,7 +71,8 @@ function renderBar() {
       ${icon('search')}<input class="input" name="q" type="search" placeholder="Buscar productos: leche, arroz, pollo…" value="${esc(current)}" aria-label="Buscar productos">
     </form>
     <div class="tools">
-      ${u ? `<a class="btn ghost" href="#/pedidos">${icon('receipt')}<span class="label">Mis pedidos</span></a>
+      ${u ? `${u.role === 'cliente' ? `<a class="btn ghost" href="#/puntos" title="Mis puntos">${icon('star')}<span class="label">Puntos</span></a>` : ''}
+             <a class="btn ghost" href="#/pedidos">${icon('receipt')}<span class="label">Mis pedidos</span></a>
              <a class="btn ghost" href="#/cuenta" title="${esc(u.fullName)}">${icon('user')}<span class="label">${esc(u.fullName.split(' ')[0])}</span></a>`
           : `<a class="btn ghost" href="#/ingresar">${icon('user')}<span class="label">Ingresar</span></a>`}
       <button class="btn ink cart-btn" id="cart-btn" aria-label="Carrito">${icon('cart')}<span class="label">Carrito</span>${count ? `<span class="count">${count}</span>` : ''}</button>

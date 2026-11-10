@@ -13,6 +13,7 @@ public class DeliveryDbContext(DbContextOptions<DeliveryDbContext> options) : Db
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<OrderEvent> OrderEvents => Set<OrderEvent>();
     public DbSet<RegistrationPayment> RegistrationPayments => Set<RegistrationPayment>();
+    public DbSet<PointsEntry> PointsEntries => Set<PointsEntry>();
     public DbSet<StoreSettings> Settings => Set<StoreSettings>();
     public DbSet<PasswordReset> PasswordResets => Set<PasswordReset>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
@@ -35,6 +36,17 @@ public class DeliveryDbContext(DbContextOptions<DeliveryDbContext> options) : Db
             e.Property(x => x.Role).HasMaxLength(20);
             e.Property(x => x.Vehicle).HasMaxLength(60);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ReferralCode).HasMaxLength(12);
+            e.HasIndex(x => x.ReferralCode).IsUnique();
+            e.HasIndex(x => x.ReferredById);
+        });
+        model.Entity<PointsEntry>(e =>
+        {
+            e.HasIndex(x => x.UserId);
+            // Un pedido da puntos una sola vez por persona y tipo (aunque se marque entregado dos veces).
+            e.HasIndex(x => new { x.OrderId, x.UserId, x.Kind }).IsUnique();
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(12);
+            e.Property(x => x.Description).HasMaxLength(200);
         });
         model.Entity<Category>(e =>
         {
